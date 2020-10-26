@@ -1,42 +1,3 @@
-
-/*
-// defines pins numbers
-const int stepPin = 3; 
-const int dirPin = 4; 
-const int pitch = 6; //Pitch in mm
-const int RPM = 300; //Expected motor speed in rpm
-const int wait = 1500; //(RPM*200)/(60*1000000);
-
-const int travel = 100; //Travel in mm
-const int steps = (travel/6)*200;
-void setup() {
-  // Sets the two pins as Outputs
-  pinMode(stepPin,OUTPUT); 
-  pinMode(dirPin,OUTPUT);
-}
-void loop() {
-  digitalWrite(dirPin,HIGH); // Enables the motor to move in a particular direction
-  // Makes 200 pulses for making one full cycle rotation for 1.8deg/step motor
-  for(int x = 0; x < steps; x++) {
-    digitalWrite(stepPin,HIGH); 
-    delayMicroseconds(wait); 
-    digitalWrite(stepPin,LOW); 
-    delayMicroseconds(wait); 
-  }
-  delay(1000); // One second delay
-  
-  digitalWrite(dirPin,LOW); //Changes the rotations direction
-  // Makes 400 pulses for making two full cycle rotation
-  for(int x = 0; x < steps; x++) {
-    digitalWrite(stepPin,HIGH);
-    delayMicroseconds(wait);
-    digitalWrite(stepPin,LOW);
-    delayMicroseconds(wait);
-  }
-  delay(1000);
-}
-
-*/
 // defines pins numbers
 const int motor = 1; //left motor = 1, right motor = 2
 const int stepPin = 3; 
@@ -47,20 +8,7 @@ const int RPM = 300; //Expected motor speed in rpm
 const int wait = 1500; //(RPM*200)/(60*1000000);
 
 static int new_pos;
-static int cur_pos; 
-
-const int homing = 0;
-const int refill = 800; 
-const int c1 = 740;
-const int c2 = 700;
-const int d1 = 700; 
-const int c3 = 650;
-const int d2 = 650;
-const int c4 = 550;
-const int d3 = 550;
-const int c5 = 450;
-const int d4 = 450;
-const int d5 = 350; 
+static int cur_pos;
 
 void setup() {
   // Sets the two pins as Outputs
@@ -71,7 +19,7 @@ void setup() {
 }
 
 void initiate(){
-  delay(5000);
+  delay(1000);
   if (motor == 1){
     digitalWrite(dirPin,HIGH);
     }
@@ -85,9 +33,11 @@ void initiate(){
     digitalWrite(stepPin,LOW); 
     delayMicroseconds(wait);
     }
-  delay(5000);
+  delay(1000);
   
-  cur_pos = homing; 
+  cur_pos = 0;
+  Serial.print("Initiated.");
+  Serial.println();
   
 }
 
@@ -130,16 +80,26 @@ int calc(int new_pos){
 }
 
 void loop() {
+  delay(1000);
+  Serial.print("Welcome!");
+  Serial.println();
   initiate();
-  while(1){
-  while (Serial.available()==0){
-  }
-  new_pos = Serial.read();
-  if (new_pos == 100 or new_pos == 200){
-    //break while loop and initiate again. 
+  int ining = 0;
+  while(ining == 0){
+  if (Serial.available()>0){
+  new_pos = Serial.parseInt();
+  Serial.print("New position demand detected.");
+  Serial.print(new_pos);
+  Serial.println();
+  new_pos = new_pos%100;
+  if (new_pos == 0){
+    ining = 1; 
+    Serial.print("Initiating again.");
+    Serial.println();
   }
   else{
     drive(new_pos);
   }
   }
+}
 }
