@@ -8,7 +8,7 @@ const int RPM = 300; //Expected motor speed in rpm
 const int wait = 1500; //(RPM*200)/(60*1000000);
 
 static int new_pos;
-static int cur_pos;
+static int cur_pos_mm;
 
 void setup() {
   // Sets the two pins as Outputs
@@ -35,48 +35,112 @@ void initiate(){
     }
   delay(1000);
   
-  cur_pos = 0;
+  cur_pos_mm = 0;
   Serial.print("Initiated.");
+  Serial.println();
   Serial.println();
   
 }
 
 void drive(int new_pos){
-  int steps, dir; 
-  steps, dir = calc(new_pos);
-  if (dir == 0){
+  int steps; 
+  steps = calc(new_pos);
+  
+  if (steps < 0){
     digitalWrite(dirPin,HIGH); // Enables the motor to move in a particular direction
+    Serial.print("Setting direction to high.");
+    Serial.println();
   }
   else{
     digitalWrite(dirPin,LOW);
+    Serial.print("Setting direction to low.");
+    Serial.println();
   }
     
   // Makes 200 pulses for making one full cycle rotation for 1.8deg/step motor
-  for(int x = 0; x < steps; x++){
+  int check = 0;
+  Serial.print("Moving...");
+  Serial.println();
+  for(int x = 0; x < abs(steps); x++){
     digitalWrite(stepPin,HIGH); 
     delayMicroseconds(wait); 
     digitalWrite(stepPin,LOW); 
     delayMicroseconds(wait); 
+    check++;
   }
+  Serial.print(check);
+  Serial.print(" steps completed");
+  Serial.println();
   
-  cur_pos = new_pos; 
+  cur_pos_mm = getDistance(new_pos); 
+  Serial.print("Current position: ");
+  Serial.print(cur_pos_mm);
+  Serial.println();
   delay(1000); // One second delay
 }
 
 int calc(int new_pos){
-  int distance_mm, dir, steps; 
+  int distance_mm, dir, steps, dist; 
+
+  dist = getDistance(new_pos);
+  Serial.print("Target distance from homing: ");
+  Serial.print(dist);
+  Serial.print(" [mm].");
+  Serial.println();
   
-  distance_mm = cur_pos - new_pos; 
-  if (distance_mm > 0) {
-    dir = 1;
-  }
-  else{
-    dir = 0;
-  }
+  distance_mm = cur_pos_mm - dist; 
+  Serial.print("Distance to travel: ");
+  Serial.print(abs(distance_mm));
+  Serial.print(" [mm].");
+  Serial.println();
   
   steps = (distance_mm/6*200);
+  Serial.print("Steps: ");
+  Serial.print(abs(steps));
+  Serial.println();
   
-  return steps, dir;
+  return steps;
+}
+
+int getDistance(int new_pos){
+  int dist;
+
+  switch (new_pos){
+    case 1:
+      dist = 590;
+      break;
+    case 11:
+      dist = 100;
+      break;
+    case 12:
+      dist = 170;
+      break;
+    case 21:
+      dist = 170;
+      break;
+    case 13:
+      dist = 240;
+      break;
+    case 22:
+      dist = 240;
+      break;
+    case 14:
+      dist = 310;
+      break;
+    case 23:
+      dist = 310;
+      break;
+    case 15:
+      dist = 380;
+      break;
+    case 24:
+      dist = 380;
+      break;
+    case 25:
+      dist = 450;
+      break;
+  }
+  return dist;
 }
 
 void loop() {
@@ -88,7 +152,9 @@ void loop() {
   while(ining == 0){
   if (Serial.available()>0){
   new_pos = Serial.parseInt();
-  Serial.print("New position demand detected.");
+  Serial.read();
+  Serial.print("New position demand detected:");
+  Serial.println();
   Serial.print(new_pos);
   Serial.println();
   new_pos = new_pos%100;
@@ -98,6 +164,9 @@ void loop() {
     Serial.println();
   }
   else{
+    Serial.print("Moving to: ");
+    Serial.print(new_pos);
+    Serial.println();
     drive(new_pos);
   }
   }
