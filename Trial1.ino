@@ -107,37 +107,37 @@ int getDistance(int new_pos){
 
   switch (new_pos){
     case 1:
-      dist = 590;
+      dist = 405; //405.25
       break;
     case 11:
-      dist = 100;
+      dist = 5;
       break;
     case 12:
-      dist = 170;
+      dist = 75; //75.2
       break;
     case 21:
-      dist = 170;
+      dist = 75; //75.2
       break;
     case 13:
-      dist = 240;
+      dist = 145; //145.4
       break;
     case 22:
-      dist = 240;
+      dist = 145; //145.4
       break;
     case 14:
-      dist = 310;
+      dist = 216; //215.6
       break;
     case 23:
-      dist = 310;
+      dist = 216; //215.6
       break;
     case 15:
-      dist = 380;
+      dist = 286; //285.8
       break;
     case 24:
-      dist = 380;
+      dist = 286; //285.8
       break;
     case 25:
-      dist = 450;
+      dist = 356;
       break;
   }
   return dist;
