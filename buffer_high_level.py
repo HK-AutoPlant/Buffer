@@ -61,13 +61,15 @@ class EmergencyInterruptException(Exception):
     print("Emergency Sensor Triggered")
     pass
 
+class NoTrayReadyException(Exception):
+    pass
 
-class BufferThread(NanoUsb):
+class BufferControl(NanoUsb):
     """
     This class deals with overall workings and logics for the buffer system
-    Call this class to create one thread for one buffer tray system
-    Sends the "init" string to Arduino tied to thread
-    Arduino handling
+    Call this class to create one thread for one buffer tray system(?)
+    TODO Ask Mattias how to assign "workers" to a function (would be neat to use!!!)
+    If both trays are ready, use tray 1
     """
     def __init__(self, arduino_port):
         super().__init__(arduino_port)
@@ -80,9 +82,12 @@ class BufferThread(NanoUsb):
         self.tray_ready = False
         self.tray_ready_position = None
         self.move_tray_init()
+        self.move_ready = False
+        # When True the tray is ready to be moved from drop-off
         """
         Below: Old Variables
         """
+        self.sensor_pin = 20
         self.GPIO = GPIO
         self.GPIO.setmode(self.GPIO.BCM)
         self.GPIO.setup(self.sensor_pin, self.GPIO.IN, pull_up_down=self.GPIO.PUD_UP)
@@ -93,7 +98,6 @@ class BufferThread(NanoUsb):
         self.logging.basicConfig(level=logging.DEBUG, filename="thread_logger.log",
                                  filemode="w", format='%(name)s - %(levelname)s - %(message)s '
                                                       '-%(asctime)s - %(message)s', datefmt='%d-%b-%y %H:%M:%S')
-
         self.logging.debug("Started high level buffer thread")
 
     def move_tray_init(self):
@@ -102,6 +106,47 @@ class BufferThread(NanoUsb):
         read_array = self.read()
         self.tray_ready_position = read_array[0]
         self.tray_ready = True
+
+    def move_ready_tray(self):
+        while True:
+            while not self.tray_ready:
+                if self.tray_ready_ready:
+                    # Move the tray that's from buffer
+                    if self.tray_ready_position == 1:
+                        self.start_tray_one()
+                    elif self.tray_ready_position == 2:
+                        self.start_tray_two
+                    else:
+                        raise NoTrayReadyException
+                time.sleep(0.25)
+
+    def start_tray_one(self):
+        # This Function should move tray one from drop-off zone and back
+        # Moves tray to end of the rail
+        # Moves tray from end to position 1
+        # Iterates the tray one plant drop position at a tie
+        # Add functions for sending open command to the servos in between (1,2,3,4,5)
+        self.move_tray_to_end()
+        if self.read() == 1234:
+            pass
+        self.move_tray_to_drop_start()
+        if self.read() == 1234:
+            self.move_tray_one_step(1)
+            if self.read() == 1234:
+                self.move_tray_one_step(2)
+                if self.read() == 1234:
+                    self.move_tray_one_step(3)
+                    if self.read() == 1234:
+                        self.move_tray_one_step(4)
+                        if self.read() == 1234:
+                            self.move_tray_one_step(5)
+                            if self.read() == 1234:
+                                self.move_tray_to_start()
+        pass
+
+    def start_tray_two(self):
+        # This Function should move tray two from drop-off zone and back
+        pass
 
     def read(self):
         self.read_array = self.recv()
@@ -114,6 +159,10 @@ class BufferThread(NanoUsb):
             for i in self.read_array:
                 return_array.append(i)
             return return_array
+
+    def trees_dropped(self, tray_number):
+        self.tray_ready_position = tray_number
+        self.move_ready = True
 
     def is_ready(self):
         """
@@ -133,9 +182,8 @@ class BufferThread(NanoUsb):
     #     GPIO.cleanup()
     #     sys.exit(0)
     #
-    # def sensor_interrupt_callback(self):
-    #     print("Sensor Triggered")
-    #     self.Nano.write("SensorReset")
+    def sensor_interrupt_callback(self):
+        print("Sensor Triggered")
     #
     #     # TODO After performing system reset, send a wait to gripper/gantry
     #     # TODO After an entire rerun of the tray has been performed, stop wait
@@ -162,8 +210,5 @@ class BufferThread(NanoUsb):
     #
 
 
-
-
 if __name__ == '__main__':
-    thread_one = BufferThread("/dev/ttyUSB0", "tray 1", 1)
-    thread_one.start()
+    Buffer_Control = BufferControl("/dev/ttyUSB0")
