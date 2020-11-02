@@ -17,7 +17,6 @@ This file has following classes:
 MainBuffer
 NanoUsb(port(optional, preset to /dev/ttyUSB0), baud(optional, preset to 115200)
 https://roboticsbackend.com/raspberry-pi-gpio-interrupts-tutorial/
-
 """
 
 
@@ -72,6 +71,33 @@ class BufferControl(NanoUsb):
     If both trays are ready, use tray 1
     """
     def __init__(self, arduino_port):
+        super().__init__(arduino_port)
+        """
+        :param arduino_port:
+        """
+
+        self.write_array = 0
+        self.read_array = 0
+        self.tray_ready = False
+        self.tray_ready_position = None
+        self.move_tray_init()
+        self.move_ready = False
+        # When True the tray is ready to be moved from drop-off
+        """
+        Below: Old Variables
+        """
+        self.sensor_pin = 20
+        self.GPIO = GPIO
+        self.GPIO.setmode(self.GPIO.BCM)
+        self.GPIO.setup(self.sensor_pin, self.GPIO.IN, pull_up_down=self.GPIO.PUD_UP)
+        # Setup the thread sensor interrupts to appropriate sensor pin
+        self.GPIO.add_event_detect(self.sensor_pin, self.GPIO.BOTH,
+                                   callback=self.sensor_interrupt_callback(), bouncetime=50)
+        self.logging = logging
+        self.logging.basicConfig(level=logging.DEBUG, filename="thread_logger.log",
+                                 filemode="w", format='%(name)s - %(levelname)s - %(message)s '
+                                                      '-%(asctime)s - %(message)s', datefmt='%d-%b-%y %H:%M:%S')
+        self.logging.debug("Started high level buffer thread")def __init__(self, arduino_port):
         super().__init__(arduino_port)
         """
         :param arduino_port:
@@ -208,6 +234,84 @@ class BufferControl(NanoUsb):
     #             time.sleep(0.1)
     #             self.listen = self.Nano.recv()
     #
+
+
+class tray1():
+    def __init__(self, arduino_port):
+        super().__init__(arduino_port)
+        
+        self.no_of_cups = 5
+        self.plant_detect = [1,2,3,4,5] #Should contain the number of cup's which are full.
+        self.detect_position = 0 #should contain distance in mm from home
+        self.current_position = Home
+        """
+        :param arduino_port:
+        """
+
+        self.write_array = 0
+        self.read_array = 0
+        self.tray_ready = False
+        self.tray_ready_position = None
+        self.move_tray_init()
+        self.move_ready = False
+
+    def tray_posedetection(self):
+        arduino keeps track of where tray is with respect to home
+        if self.detect_position <= 10:
+            self.current_position = Home
+        elif self.detect_position >= 150 and self.detect_position <= 200:
+            self.current_position = First_Dropoff
+        elif self.detect_position > 200 and self.detect_position <= 250:
+            self.current_position = Second_Dropoff
+        elif self.detect_position > 250 and self.detect_position <= 300:
+            self.current_position = Third_Dropoff
+        elif self.detect_position > 300 and self.detect_position <= 350:
+            self.current_position = Fourth_Dropoff
+        elif self.detect_position > 350 and self.detect_position <= 400:
+            self.current_position = Fifth_Dropoff
+        elif self.detect_position > 500 and self.detect_position <= 800:
+            self.current_position = Restock
+        """ Add more postiions if in mind """
+        
+    def Homing_Seq(self):
+        #Everytime system is restarted and switched from manual back to auto and position at home
+        #perform Homing
+        elif restock_count == 20:
+            self.output_array = append[]
+
+    def Restocking_Seq(self):
+        #When all the cups are empty and tray position near to home
+        if self.plant_detect is None and self.detect_position == Home:
+            self.output_array = append[] #perform restocking i.e write the number to output array
+        
+    
+    def dropoff_seq(self):
+        when all the cups are full and tray position near dropoff
+        if self.plant_detect is full and self.detect_position == 
+        x = 1
+        for x:5
+            dropoff(1)
+            if dropoff(1) success:
+                dropoff(x+1)
+            else:
+                print('Waiting Dropoff x')
+
+    def dropoff_seq(self,cup_no):
+        if cup_no sensor high: #Check the cup for the presence of Plant
+            write the number to output array for movement.
+        else:
+            return('Cup number this .. is empty')
+
+    
+
+
+    
+
+
+
+
+
+
 
 
 if __name__ == '__main__':
