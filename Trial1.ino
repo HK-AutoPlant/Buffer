@@ -57,6 +57,10 @@ voidstepperRun(int direction, steps){
     delayMicroseconds(wait); 
     digitalWrite(stepPin,LOW); 
     delayMicroseconds(wait);
+    if (x%20==0){
+      int mm = (x/200)*6; //mm = number of revolutions * mm per revolution = rev * (mm/rev) = mm
+      Serial.print(x); //Print position to Rpi 10 times every revolution (every 0.6mm)
+    }
   }
 }
 //----------------------------------------DRIVE TO REQUIRED POSITION---------------------------------------------
@@ -162,31 +166,25 @@ int getDistance(int new_pos){
 }
 
 void loop() {
-  delay(1000);
-  Serial.print("Welcome!");
-  Serial.println();
+
   initiate();
   int ining = 0;
+  
   while(ining == 0){
-  if (Serial.available()>0){
-  new_pos = Serial.parseInt();
-  Serial.read();
-  Serial.print("New position demand detected:");
-  Serial.println();
-  Serial.print(new_pos);
-  Serial.println();
-  new_pos = new_pos%100;
-  if (new_pos == 0){
-    ining = 1; 
-    Serial.print("Initiating again.");
-    Serial.println();
-  }
-  else{
-    Serial.print("Moving to: ");
-    Serial.print(new_pos);
-    Serial.println();
-    drive(new_pos);
-  }
+    if (Serial.available()>0){
+      new_pos = Serial.parseInt();
+      Serial.read();
+      new_pos = new_pos%100;
+    if (new_pos == 0){
+      ining = 1; 
+    }
+    else if (new_pos == 6){ //Position query
+    }
+    else if (new_pos == 7){ //Sensor query
+    }
+    else{
+      drive(new_pos);
+    }
   }
 }
 }
