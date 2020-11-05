@@ -17,6 +17,7 @@ This file has following classes:
 MainBuffer
 NanoUsb(port(optional, preset to /dev/ttyUSB0), baud(optional, preset to 115200)
 https://roboticsbackend.com/raspberry-pi-gpio-interrupts-tutorial/
+
 """
 
 
@@ -47,8 +48,8 @@ class NanoUsb:
         if self.serial_nano.in_waiting > 0:
             return True
 
-    def write(self, one, two, three, four):
-        data = one+two+three+four
+    def write(self, one, two, three):
+        data = one+two+three
         self.serial_nano.write(data)
 
     def recv(self):
@@ -60,8 +61,10 @@ class EmergencyInterruptException(Exception):
     print("Emergency Sensor Triggered")
     pass
 
+
 class NoTrayReadyException(Exception):
     pass
+
 
 class BufferControl(NanoUsb):
     """
@@ -79,37 +82,15 @@ class BufferControl(NanoUsb):
         self.write_array = 0
         self.read_array = 0
         self.tray_ready = False
-        self.tray_ready_position = None
+        self.tray_position = 0
+        # 0 is initial position, 1 means tray is in position to drop plant from cup 1
         self.move_tray_init()
         self.move_ready = False
-        # When True the tray is ready to be moved from drop-off
-        """
-        Below: Old Variables
-        """
-        self.sensor_pin = 20
-        self.GPIO = GPIO
-        self.GPIO.setmode(self.GPIO.BCM)
-        self.GPIO.setup(self.sensor_pin, self.GPIO.IN, pull_up_down=self.GPIO.PUD_UP)
-        # Setup the thread sensor interrupts to appropriate sensor pin
-        self.GPIO.add_event_detect(self.sensor_pin, self.GPIO.BOTH,
-                                   callback=self.sensor_interrupt_callback(), bouncetime=50)
-        self.logging = logging
-        self.logging.basicConfig(level=logging.DEBUG, filename="thread_logger.log",
-                                 filemode="w", format='%(name)s - %(levelname)s - %(message)s '
-                                                      '-%(asctime)s - %(message)s', datefmt='%d-%b-%y %H:%M:%S')
-        self.logging.debug("Started high level buffer thread")def __init__(self, arduino_port):
-        super().__init__(arduino_port)
-        """
-        :param arduino_port:
-        """
-
-        self.write_array = 0
-        self.read_array = 0
-        self.tray_ready = False
-        self.tray_ready_position = None
-        self.move_tray_init()
-        self.move_ready = False
-        # When True the tray is ready to be moved from drop-off
+        # When True, a tray has reached the restock zone and is in waiting state
+        self.nano_return_int = 111
+        self.tray_position_restock = 1
+        self.restock_counter = 0
+        self.plant_in_cup = [0,0,0,0,0]
         """
         Below: Old Variables
         """
@@ -128,67 +109,163 @@ class BufferControl(NanoUsb):
 
     def move_tray_init(self):
         # TODO replace with correct ints
-        self.write(1, 1, 0, 0)
-        read_array = self.read()
-        self.tray_ready_position = read_array[0]
+        self.write(1, 0, 0)
+        # function to move tray to restock position
+        self.read()
+        self.tray_position = 0
+        # Assigns tray position variable to init position
         self.tray_ready = True
+        # tray_ready variable is True, (for is_ready function call)
 
-    def move_ready_tray(self):
-        while True:
-            while not self.tray_ready:
-                if self.tray_ready_ready:
-                    # Move the tray that's from buffer
-                    if self.tray_ready_position == 1:
-                        self.start_tray_one()
-                    elif self.tray_ready_position == 2:
-                        self.start_tray_two
-                    else:
-                        raise NoTrayReadyException
-                time.sleep(0.25)
+    def state_machine(self):
+        """
+        Buffer State Machine
+        Calls a function for each state
+        :return:
+        """
+        if self.tray_ready:
+            counter = 0
+            self.check_plants()
+            for i in range(len(self.plant_in_cup)):
+                if self.plant_in_cup[i] == 1:
+                    counter = counter + 1
+            if counter == 5:
+                state = 1
+                self.logging.debug("5 Plants were found after restock")
+            elif counter == 0:
+                state = 20
+                self.logging.error("No plants were found after restock. Tray will perform reset")
+            else:
+                state = 1
+                self.logging.warning("5 Plants were not found after restock, "
+                                     "%d Plants were found in tray" % counter)
+            if state == 2:
+                self.move_tray_to_first_drop()
+                self.tray_position = self.check_position()
+                if (self.tray_position < 800) and (self.tray_position > 700) and (self.plant_in_cup[0] == 1):
+                    self.open_tray()
+                    self.tray_position = self.check_position()
 
-    def start_tray_one(self):
-        # This Function should move tray one from drop-off zone and back
-        # Moves tray to end of the rail
-        # Moves tray from end to position 1
-        # Iterates the tray one plant drop position at a tie
-        # Add functions for sending open command to the servos in between (1,2,3,4,5)
-        self.move_tray_to_end()
-        if self.read() == 1234:
-            pass
-        self.move_tray_to_drop_start()
-        if self.read() == 1234:
-            self.move_tray_one_step(1)
-            if self.read() == 1234:
-                self.move_tray_one_step(2)
-                if self.read() == 1234:
-                    self.move_tray_one_step(3)
-                    if self.read() == 1234:
-                        self.move_tray_one_step(4)
-                        if self.read() == 1234:
-                            self.move_tray_one_step(5)
-                            if self.read() == 1234:
-                                self.move_tray_to_start()
-        pass
+            if state == 4:
+                self.move_tray_one_step()
+                self.open_tray()
+                self.tray_position = self.check_position()
+                if (self.tray_position < 600) and (self.tray_position > 500):
+                    self.check_plants()
+                    while self.plant_in_cup[1] == 1:
+                        self.check_plants()
+                        if self.plant_in_cup[1] == 0:
+                            state = 5
+                        elif self.plant_in_cup[1] == 1:
+                            self.open_tray()
+                else:
+                    # TODO Write to arduino to move to position
+                    pass
+            if state == 5:
+                self.move_tray_one_step()
+                self.open_tray()
+                self.tray_position = self.check_position()
+                if (self.tray_position < 500) and (self.tray_position > 400):
+                    self.check_plants()
+                    while self.plant_in_cup[2] == 1:
+                        self.check_plants()
+                        if self.plant_in_cup[2] == 0:
+                            state = 6
+                        elif self.plant_in_cup[2] == 1:
+                            self.open_tray()
+                else:
+                    # TODO Write to arduino to move to position 3
+                    pass
+            if state == 6:
+                self.move_tray_one_step()
+                self.open_tray()
+                self.tray_position = self.check_position()
+                if (self.tray_position < 400) and (self.tray_position > 300):
+                    self.check_plants()
+                    while self.plant_in_cup[3] == 1:
+                        self.check_plants()
+                        if self.plant_in_cup[3] == 0:
+                            state = 7
+                        elif self.plant_in_cup[3] == 1:
+                            self.open_tray()
+                else:
+                    # TODO Write to arduino to move to position 4
+                    pass
+            if state == 7:
+                self.move_tray_one_step()
+                self.open_tray()
+                self.tray_position = self.check_position()
+                if (self.tray_position < 300) and (self.tray_position > 200):
+                    self.check_plants()
+                    while self.plant_in_cup[4] == 1:
+                        self.check_plants()
+                        if self.plant_in_cup[4] == 0:
+                            state = 8
+                        elif self.plant_in_cup[4] == 1:
+                            self.open_tray()
+                else:
+                    # TODO Write to arduino to move to position 5
+                    pass
+            if state == 8:
+                self.move_tray_to_end()
+            if state == 20:
+                self.move_tray_init()
+
+    def check_plants(self):
+        self.write(1, 2, 3)
+        output_array = []
+        data = self.recv()
+        for i in range(len(data)):
+            output_array.append(data(i))
+        self.plant_in_cup = output_array[2:]
+
+    def move_tray_to_end(self):
+        self.write(1,2,3)
+
+    def open_tray(self):
+        self.write(1,2,3)
+
+    def move_tray_one_step(self):
+        self.write(1,2,3)
+        waiting_for_finish = True
+        while waiting_for_finish:
+            waiting_for_finish = self.read()
+
+    def move_tray_to_start(self):
+        self.write(1,2,3)
+
+    def move_tray_to_first_drop(self):
+        self.write(1,2,3)
 
     def start_tray_two(self):
         # This Function should move tray two from drop-off zone and back
         pass
 
     def read(self):
-        self.read_array = self.recv()
-        read_array_old = self.read_array
-        return_array = []
-        while read_array_old == self.read_array:
-            self.read_array = self.recv()
-            if self.read_array == read_array_old:
-                time.sleep(0.05)
-            for i in self.read_array:
-                return_array.append(i)
-            return return_array
+        waiting = True
+        while waiting:
+            read = self.recv()
+            time.sleep(0.1)
+            if read == self.nano_return_int:
+                waiting = False
+        return read
+
+    def write_finished(self):
+        waiting = True
+        while waiting:
+            read = self.recv()
+            time.sleep(0.1)
+            if read == 111:
+                waiting = True
+
+    def check_position(self):
+        self.write(1,2,3)
+        data = self.read()
+        position_mm = data[3:]
+        return position_mm
 
     def trees_dropped(self, tray_number):
-        self.tray_ready_position = tray_number
-        self.move_ready = True
+        self.tray_ready = False
 
     def is_ready(self):
         """
@@ -198,11 +275,7 @@ class BufferControl(NanoUsb):
         and an int (1 or 2) that corresponds to the position of the tray.
         When False a None type object is the second return parameter.
         """
-        tray_ready = self.tray_ready
-        tray_position = self.tray_ready_position
-        if tray_ready is False:
-            tray_position = None
-        return tray_ready, tray_position
+        return self.tray_ready, self.tray_position_restock
 
     # def signal_handler(self, sig, frame):
     #     GPIO.cleanup()
@@ -214,104 +287,6 @@ class BufferControl(NanoUsb):
     #     # TODO After performing system reset, send a wait to gripper/gantry
     #     # TODO After an entire rerun of the tray has been performed, stop wait
     #     raise EmergencyInterruptException()
-    #
-    # def run(self):
-    #     """
-    #     Main thread loop function
-    #     :return:
-    #     """
-    #     while True:
-    #         self.listen = self.Nano.recv()
-    #         # Some Way To Get Gripper That Plants Handed Off
-    #         self.Nano.write("function_1")
-    #         # Tell Arduino to execute function 1
-    #         self.listen = self.Nano.recv()
-    #         state = False
-    #         # Waits for function 1 to be finished
-    #         while state is False:
-    #             if self.listen == "complete_1":
-    #                 state = True
-    #             time.sleep(0.1)
-    #             self.listen = self.Nano.recv()
-    #
-
-
-class tray1():
-    def __init__(self, arduino_port):
-        super().__init__(arduino_port)
-        
-        self.no_of_cups = 5
-        self.plant_detect = [1,2,3,4,5] #Should contain the number of cup's which are full.
-        self.detect_position = 0 #should contain distance in mm from home
-        self.current_position = Home
-        """
-        :param arduino_port:
-        """
-
-        self.write_array = 0
-        self.read_array = 0
-        self.tray_ready = False
-        self.tray_ready_position = None
-        self.move_tray_init()
-        self.move_ready = False
-
-    def tray_posedetection(self):
-        arduino keeps track of where tray is with respect to home
-        if self.detect_position <= 10:
-            self.current_position = Home
-        elif self.detect_position >= 150 and self.detect_position <= 200:
-            self.current_position = First_Dropoff
-        elif self.detect_position > 200 and self.detect_position <= 250:
-            self.current_position = Second_Dropoff
-        elif self.detect_position > 250 and self.detect_position <= 300:
-            self.current_position = Third_Dropoff
-        elif self.detect_position > 300 and self.detect_position <= 350:
-            self.current_position = Fourth_Dropoff
-        elif self.detect_position > 350 and self.detect_position <= 400:
-            self.current_position = Fifth_Dropoff
-        elif self.detect_position > 500 and self.detect_position <= 800:
-            self.current_position = Restock
-        """ Add more postiions if in mind """
-        
-    def Homing_Seq(self):
-        #Everytime system is restarted and switched from manual back to auto and position at home
-        #perform Homing
-        elif restock_count == 20:
-            self.output_array = append[]
-
-    def Restocking_Seq(self):
-        #When all the cups are empty and tray position near to home
-        if self.plant_detect is None and self.detect_position == Home:
-            self.output_array = append[] #perform restocking i.e write the number to output array
-        
-    
-    def dropoff_seq(self):
-        when all the cups are full and tray position near dropoff
-        if self.plant_detect is full and self.detect_position == 
-        x = 1
-        for x:5
-            dropoff(1)
-            if dropoff(1) success:
-                dropoff(x+1)
-            else:
-                print('Waiting Dropoff x')
-
-    def dropoff_seq(self,cup_no):
-        if cup_no sensor high: #Check the cup for the presence of Plant
-            write the number to output array for movement.
-        else:
-            return('Cup number this .. is empty')
-
-    
-
-
-    
-
-
-
-
-
-
 
 
 if __name__ == '__main__':
