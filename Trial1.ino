@@ -4,6 +4,7 @@
 const int motor = 1; //Motor 1 or 2, still don't know exactly which one will move in which direction. 
 const int stepPin = 3;  
 const int dirPin = 2; 
+const int switchPin = 6;
 
 //Motor and lead screw specifics. 
 const int pitch = 6; //Pitch in mm
@@ -25,24 +26,17 @@ void setup() {
 
 //---------------------------------------------INITIATION/HOMING------------------------------------------------
 void initiate(){
-  delay(1000);
   
-  //Setting direction depending on which tray the arduino is controlling. The motors/trays are not yet defined. 
-  if (motor == 1){
-    digitalWrite(dirPin,HIGH);
-    }
-  if (motor == 2){
-    digitalWrite(dirPin,LOW);
-    }
-    
   //This continously runs the motor untill the homing switch is reached. 
-  for(int x = 0; x < 100; x++){//while(no signal from switch){
-    digitalWrite(stepPin,HIGH);
-    delayMicroseconds(wait); 
-    digitalWrite(stepPin,LOW); 
-    delayMicroseconds(wait);
+  int direction = 0;
+  int steps = 1;
+  while(1){
+    stepperRun(direction,steps);
+    if (digital.Read(switchPin) == HIGH){
+      delay(50);
+      break;
     }
-  delay(1000);
+  }
   
   //Update the tray position to the homing position = 0mm. 
   cur_pos_mm = 0;
@@ -50,7 +44,21 @@ void initiate(){
   //Send clear signal to the Raspberry Pi = 999. 
   Serial.print("999");
 }
-
+//------------------------------------------------STEPPER RUNNING------------------------------------------------
+voidstepperRun(int direction, steps){
+  if (direction == 1){
+    digitalWrite(dirPin,HIGH);
+  }
+  else{
+    digitalWrite(dirPin,LOW);
+  }
+  for (int x = 0; x<steps; x++){
+    digitalWrite(stepPin,HIGH);
+    delayMicroseconds(wait); 
+    digitalWrite(stepPin,LOW); 
+    delayMicroseconds(wait);
+  }
+}
 //----------------------------------------DRIVE TO REQUIRED POSITION---------------------------------------------
 void drive(int new_pos){
   int steps; 
