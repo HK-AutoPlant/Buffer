@@ -1,15 +1,20 @@
-// defines pins numbers
-const int motor = 1; //left motor = 1, right motor = 2
-const int stepPin = 3; 
+
+
+// define pins on the Arduino nano board. 
+const int motor = 1; //Motor 1 or 2, still don't know exactly which one will move in which direction. 
+const int stepPin = 3;  
 const int dirPin = 2; 
 
+//Motor and lead screw specifics. 
 const int pitch = 6; //Pitch in mm
 const int RPM = 300; //Expected motor speed in rpm
-const int wait = 1500; //(RPM*200)/(60*1000000);
+const int wait = 1500; //(RPM*200)/(60*1000000). This sets the wait between output steps to the stepper motor. A longer wait will mean a slower motor speed. 
 
+//Tray positions. 
 static int new_pos;
 static int cur_pos_mm;
 
+//---------------------------------------------------SETUP-----------------------------------------------------
 void setup() {
   // Sets the two pins as Outputs
   pinMode(stepPin,OUTPUT); 
@@ -18,8 +23,11 @@ void setup() {
   Serial.begin(9600);
 }
 
+//---------------------------------------------INITIATION/HOMING------------------------------------------------
 void initiate(){
   delay(1000);
+  
+  //Setting direction depending on which tray the arduino is controlling. The motors/trays are not yet defined. 
   if (motor == 1){
     digitalWrite(dirPin,HIGH);
     }
@@ -27,6 +35,7 @@ void initiate(){
     digitalWrite(dirPin,LOW);
     }
     
+  //This continously runs the motor untill the homing switch is reached. 
   for(int x = 0; x < 100; x++){//while(no signal from switch){
     digitalWrite(stepPin,HIGH);
     delayMicroseconds(wait); 
@@ -35,73 +44,74 @@ void initiate(){
     }
   delay(1000);
   
+  //Update the tray position to the homing position = 0mm. 
   cur_pos_mm = 0;
-  Serial.print("Initiated.");
-  Serial.println();
-  Serial.println();
   
+  //Send clear signal to the Raspberry Pi = 999. 
+  Serial.print("999");
 }
 
+//----------------------------------------DRIVE TO REQUIRED POSITION---------------------------------------------
 void drive(int new_pos){
   int steps; 
+  
+  //Calls the calc() function which returns the steps and direction (+/-) required to move to the new position.
   steps = calc(new_pos);
   
+  //Sets direction of motor depending on the result from the calc() function (+/-) and the operating motor. 
   if (steps < 0){
-    digitalWrite(dirPin,HIGH); // Enables the motor to move in a particular direction
-    Serial.print("Setting direction to high.");
-    Serial.println();
+    if (motor == 1){
+      digitalWrite(dirPin,HIGH);
+    }
+    else{
+      digitalWrite(dirPin,LOW);
+    } 
   }
   else{
-    digitalWrite(dirPin,LOW);
-    Serial.print("Setting direction to low.");
-    Serial.println();
+    if (motor == 1){
+      digitalWrite(dirPin,LOW);
+    }
+    else{
+      digitalWrite(dirPin,HIGH);
+    }
   }
     
-  // Makes 200 pulses for making one full cycle rotation for 1.8deg/step motor
-  int check = 0;
-  Serial.print("Moving...");
-  Serial.println();
+  // Makes 200 pulses for making one full rotation (1.8deg/step)
+  int check = 0; 
   for(int x = 0; x < abs(steps); x++){
     digitalWrite(stepPin,HIGH); 
     delayMicroseconds(wait); 
     digitalWrite(stepPin,LOW); 
-    delayMicroseconds(wait); 
+    delayMicroseconds(wait);
     check++;
+    }
   }
-  Serial.print(check);
-  Serial.print(" steps completed");
-  Serial.println();
   
+  //Update the position in mm of the tray using the getDistance() function. 
   cur_pos_mm = getDistance(new_pos); 
-  Serial.print("Current position: ");
-  Serial.print(cur_pos_mm);
-  Serial.println();
+
   delay(1000); // One second delay
+  
+  //Return the clear signal to the Raspberry Pi, move is completed! 
+  Serial.print("999");
 }
 
+//---------------------------------------CALCULATE DISTANCE TO WANTED POSITION--------------------------------
 int calc(int new_pos){
   int distance_mm, dir, steps, dist; 
 
+  //Use the getDistance() function to calculate the wanted distance from homing. 
   dist = getDistance(new_pos);
-  Serial.print("Target distance from homing: ");
-  Serial.print(dist);
-  Serial.print(" [mm].");
-  Serial.println();
   
+  //Calculate distance and steps to move from current position. 
   distance_mm = cur_pos_mm - dist; 
-  Serial.print("Distance to travel: ");
-  Serial.print(abs(distance_mm));
-  Serial.print(" [mm].");
-  Serial.println();
-  
   steps = (distance_mm/6*200);
-  Serial.print("Steps: ");
-  Serial.print(abs(steps));
-  Serial.println();
   
+  //Return steps (positive and negative value indicate the direction)
   return steps;
 }
 
+//---------------------------------------------
 int getDistance(int new_pos){
   int dist;
 
