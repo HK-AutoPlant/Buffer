@@ -2,9 +2,13 @@
 
 // define pins on the Arduino nano board. 
 const int motor = 1; //Motor 1 or 2, still don't know exactly which one will move in which direction. 
+const int leverPin = 9; //PWM pins on nano: 3, 9, 10, 11. 
 const int stepPin = 3;  
 const int dirPin = 2; 
 const int switchPin = 6;
+
+const int done = 999;
+const int error = 666;
 
 //Motor and lead screw specifics. 
 const int pitch = 6; //Pitch in mm
@@ -13,13 +17,16 @@ const int wait = 1500; //(RPM*200)/(60*1000000). This sets the wait between outp
 
 //Tray positions. 
 static int new_pos;
+static int cur_pos_case;
 static int cur_pos_mm;
 
 //---------------------------------------------------SETUP-----------------------------------------------------
 void setup() {
-  // Sets the two pins as Outputs
+  // Sets the two stepper motor pins as Outputs
   pinMode(stepPin,OUTPUT); 
   pinMode(dirPin,OUTPUT);
+  //Sets the lever pin as Output
+  pinMode(leverPin,OUTPUT);
   // Sets up usb connection to Raspberry Pi 
   Serial.begin(9600);
 }
@@ -27,9 +34,12 @@ void setup() {
 //---------------------------------------------INITIATION/HOMING------------------------------------------------
 void initiate(){
   
-  //This continously runs the motor untill the homing switch is reached. 
+  analogWrite(leverPin, 19);
+  
+  //This continously runs the motor, one step at a time, untill the homing switch is reached. 
   int direction = 0;
   int steps = 1;
+  
   while(1){
     stepperRun(direction,steps);
     if (digital.Read(switchPin) == HIGH){
@@ -37,93 +47,71 @@ void initiate(){
       break;
     }
   }
-  
-  //Update the tray position to the homing position = 0mm. 
   cur_pos_mm = 0;
-  
-  //Send clear signal to the Raspberry Pi = 999. 
-  Serial.print("999");
 }
-//------------------------------------------------STEPPER RUNNING------------------------------------------------
-voidstepperRun(int direction, steps){
-  if (direction == 1){
+
+//----------------------------------------MOVE TRAY---------------------------------------------
+void tray_drive(int position, prev_distance_mm){ 
+  
+  int position_mm = getDistance(position);
+  int travel_mm = cur_pos_mm - (position_mm - prev_distance_mm);
+  int steps = (travel_mm/pitch)*200;
+  
+  //Set direction. 
+  if (steps < 0){
     digitalWrite(dirPin,HIGH);
   }
   else{
     digitalWrite(dirPin,LOW);
-  }
-  for (int x = 0; x<steps; x++){
-    digitalWrite(stepPin,HIGH);
-    delayMicroseconds(wait); 
-    digitalWrite(stepPin,LOW); 
-    delayMicroseconds(wait);
-    if (x%20==0){
-      int mm = (x/200)*6; //mm = number of revolutions * mm per revolution = rev * (mm/rev) = mm
-      Serial.print(x); //Print position to Rpi 10 times every revolution (every 0.6mm)
-    }
-  }
-}
-//----------------------------------------DRIVE TO REQUIRED POSITION---------------------------------------------
-void drive(int new_pos){
-  int steps; 
-  
-  //Calls the calc() function which returns the steps and direction (+/-) required to move to the new position.
-  steps = calc(new_pos);
-  
-  //Sets direction of motor depending on the result from the calc() function (+/-) and the operating motor. 
-  if (steps < 0){
-    if (motor == 1){
-      digitalWrite(dirPin,HIGH);
-    }
-    else{
-      digitalWrite(dirPin,LOW);
-    } 
-  }
-  else{
-    if (motor == 1){
-      digitalWrite(dirPin,LOW);
-    }
-    else{
-      digitalWrite(dirPin,HIGH);
-    }
-  }
+  } 
     
   // Makes 200 pulses for making one full rotation (1.8deg/step)
   int check = 0; 
   for(int x = 0; x < abs(steps); x++){
+    
     digitalWrite(stepPin,HIGH); 
     delayMicroseconds(wait); 
     digitalWrite(stepPin,LOW); 
     delayMicroseconds(wait);
+    
     check++;
-    }
+    //Writes to Rpi 10 times every rotation = every 0.6mm
+    if (check%20 == 0{
+      int mm = (check/200)*pitch;
+      Serial.write(mm);
+    }   
   }
-  
-  //Update the position in mm of the tray using the getDistance() function. 
-  cur_pos_mm = getDistance(new_pos); 
-
-  delay(1000); // One second delay
-  
-  //Return the clear signal to the Raspberry Pi, move is completed! 
-  Serial.print("999");
+  cur_pos_mm = position_mm;      
+  delay(100); // 0.1 second delay
 }
 
-//---------------------------------------CALCULATE DISTANCE TO WANTED POSITION--------------------------------
-int calc(int new_pos){
-  int distance_mm, dir, steps, dist; 
+//-----------------------------------------MOVE LEVER---------------------------------------
+void lever_drive(lever_command){
+  
+  int value; 
+  switch (lever_command){
+    case 1:
+      value = 19;
+      break;
+    case 2:
+      value = 17;
+      break;
+    case 3: 
+      value = 21;
+      break;
+    case 4: 
+      value = 13;
+      break;
+    case 5:
+      value = 25;
+      break;
+  }
 
-  //Use the getDistance() function to calculate the wanted distance from homing. 
-  dist = getDistance(new_pos);
+  analogWrite(leverPin, value);
   
-  //Calculate distance and steps to move from current position. 
-  distance_mm = cur_pos_mm - dist; 
-  steps = (distance_mm/6*200);
-  
-  //Return steps (positive and negative value indicate the direction)
-  return steps;
 }
 
-//---------------------------------------------
+//-------------------------------------GET DISTANCE IN MM------------------------------------
 int getDistance(int new_pos){
   int dist;
 
@@ -165,26 +153,56 @@ int getDistance(int new_pos){
   return dist;
 }
 
+//------------------------------------------------MAIN------------------------------------------
 void loop() {
-
-  initiate();
-  int ining = 0;
   
-  while(ining == 0){
-    if (Serial.available()>0){
-      new_pos = Serial.parseInt();
-      Serial.read();
-      new_pos = new_pos%100;
-    if (new_pos == 0){
-      ining = 1; 
+  if (Serial.available()>0){
+    
+    int command = Serial.parseInt();
+    Serial.read(); //there seems to be a "left over" 0 when using serial with the arduino app. This gets rid of it. 
+    int state = command%1000000;
+    
+    //initiation command
+    if (state == 0){  
+      initiate(); 
+      Serial.print(done);
     }
-    else if (new_pos == 6){ //Position query
+    
+    //Position Query
+    else if (state == 6){
+      Serial.write(cur_pos_mm);
     }
-    else if (new_pos == 7){ //Sensor query
+    
+    //Sensor query
+    else if (state == 7){ 
+      Serial.write("sensor");
     }
+    
+    //Lever change command
+    else if (state == 8){  
+      
+      //Calculate commands
+      int lever_command = command % 10;
+      
+      lever_drive(lever_command);
+      Serial.write(done);
+    }
+    
+    //Tray change command 
+    else if (state == 0){ 
+      
+      //Calculate commands 
+      int tray_command = (command % 1000000) / 10000;
+      int distance_command = (command % 10000) / 10;
+      
+      tray_drive(tray_command, distance_command);
+      Serial.write(done);
+    }
+    
+    //ERROR
     else{
-      drive(new_pos);
+      Serial.write(error);
     }
+    
   }
-}
 }
