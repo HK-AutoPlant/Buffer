@@ -1,4 +1,5 @@
-
+#include <Servo.h>
+Servo lever;
 
 // define pins on the Arduino nano board. 
 const int motor = 1; //Motor 1 or 2, still don't know exactly which one will move in which direction. 
@@ -13,7 +14,7 @@ const int error = 666;
 //Motor and lead screw specifics. 
 const int pitch = 6; //Pitch in mm
 const int RPM = 300; //Expected motor speed in rpm
-const int wait = 1500; //(RPM*200)/(60*1000000). This sets the wait between output steps to the stepper motor. A longer wait will mean a slower motor speed. 
+const int wait = 550; //(RPM*200)/(60*1000000). This sets the wait between output steps to the stepper motor. A longer wait will mean a slower motor speed. 
 
 //Tray positions. 
 static int new_pos;
@@ -26,7 +27,7 @@ void setup() {
   pinMode(stepPin,OUTPUT); 
   pinMode(dirPin,OUTPUT);
   //Sets the lever pin as Output
-  pinMode(leverPin,OUTPUT);
+  lever.attach(leverPin);
   // Sets up usb connection to Raspberry Pi 
   Serial.begin(9600);
 }
@@ -37,12 +38,14 @@ void initiate(){
   analogWrite(leverPin, 19);
   
   //This continously runs the motor, one step at a time, untill the homing switch is reached. 
-  int direction = 0;
-  int steps = 1;
+  digitalWrite(dirPin,LOW);
   
   while(1){
-    stepperRun(direction,steps);
-    if (digital.Read(switchPin) == HIGH){
+    digitalWrite(stepPin,HIGH); 
+    delayMicroseconds(wait); 
+    digitalWrite(stepPin,LOW); 
+    delayMicroseconds(wait);
+    if (digitalRead(switchPin) == HIGH){
       delay(50);
       break;
     }
@@ -51,14 +54,17 @@ void initiate(){
 }
 
 //----------------------------------------MOVE TRAY---------------------------------------------
-void tray_drive(int position, prev_distance_mm){ 
+void tray_drive(int position, int prev_distance_mm){ 
   
   int position_mm = getDistance(position);
-  int travel_mm = cur_pos_mm - (position_mm - prev_distance_mm);
-  int steps = (travel_mm/pitch)*200;
+  Serial.println(position_mm);
+  int travel_mm = position_mm - (cur_pos_mm - prev_distance_mm);
+  Serial.println(travel_mm);
+  int steg = ((travel_mm)*200)/pitch;
+  Serial.println(steg);
   
   //Set direction. 
-  if (steps < 0){
+  if (travel_mm > 0){
     digitalWrite(dirPin,HIGH);
   }
   else{
@@ -67,7 +73,7 @@ void tray_drive(int position, prev_distance_mm){
     
   // Makes 200 pulses for making one full rotation (1.8deg/step)
   int check = 0; 
-  for(int x = 0; x < abs(steps); x++){
+  for(int x = 0; x < abs(steg); x++){
     
     digitalWrite(stepPin,HIGH); 
     delayMicroseconds(wait); 
@@ -76,38 +82,39 @@ void tray_drive(int position, prev_distance_mm){
     
     check++;
     //Writes to Rpi 10 times every rotation = every 0.6mm
-    if (check%20 == 0{
-      int mm = (check/200)*pitch;
-      Serial.write(mm);
+    if (check%20 == 0){
+      long int mm = (check*6)/200;
     }   
   }
-  cur_pos_mm = position_mm;      
+  cur_pos_mm = position_mm;
+  Serial.println("Current position: ");
+  Serial.println(cur_pos_mm);      
   delay(100); // 0.1 second delay
 }
 
 //-----------------------------------------MOVE LEVER---------------------------------------
-void lever_drive(lever_command){
+void lever_drive(int lever_command){
   
   int value; 
   switch (lever_command){
     case 1:
-      value = 19;
+      value = 95;
       break;
     case 2:
-      value = 17;
+      value = 60;
       break;
     case 3: 
-      value = 21;
+      value = 135;
       break;
     case 4: 
-      value = 13;
+      value = 30;
       break;
     case 5:
-      value = 25;
+      value = 170;
       break;
   }
 
-  analogWrite(leverPin, value);
+  lever.write(value);
   
 }
 
@@ -116,8 +123,11 @@ int getDistance(int new_pos){
   int dist;
 
   switch (new_pos){
+    case 0:
+      dist = 0;
+      break;
     case 1:
-      dist = 405; //405.25
+      dist = 371; //405.25
       break;
     case 11:
       dist = 5;
@@ -125,29 +135,17 @@ int getDistance(int new_pos){
     case 12:
       dist = 75; //75.2
       break;
-    case 21:
-      dist = 75; //75.2
-      break;
     case 13:
-      dist = 145; //145.4
-      break;
-    case 22:
       dist = 145; //145.4
       break;
     case 14:
       dist = 216; //215.6
       break;
-    case 23:
-      dist = 216; //215.6
-      break;
     case 15:
       dist = 286; //285.8
       break;
-    case 24:
-      dist = 286; //285.8
-      break;
     case 25:
-      dist = 356;
+      dist = 350;
       break;
   }
   return dist;
@@ -155,48 +153,51 @@ int getDistance(int new_pos){
 
 //------------------------------------------------MAIN------------------------------------------
 void loop() {
+
+  String str_command;
+  long int_command;
   
   if (Serial.available()>0){
     
-    int command = Serial.parseInt();
-    Serial.read(); //there seems to be a "left over" 0 when using serial with the arduino app. This gets rid of it. 
-    int state = command%1000000;
+    Serial.println("command received:");
+    str_command = Serial.readStringUntil("/r");
+    Serial.println(str_command);
+    int_command = str_command.toInt();
+
+    int state = int_command/1000000;
+    int tray_command = (int_command % 1000000) / 10000;
+    int distance_command = (int_command % 10000) / 10;
+    int lever_command = int_command % 10;
     
     //initiation command
     if (state == 0){  
-      initiate(); 
-      Serial.print(done);
+      //initiate(); 
+      Serial.print("done");
     }
     
     //Position Query
     else if (state == 6){
-      Serial.write(cur_pos_mm);
+      Serial.write("Query: cur_pos_mm");
     }
     
     //Sensor query
     else if (state == 7){ 
-      Serial.write("sensor");
+      Serial.write("Query: sensor");
     }
     
     //Lever change command
     else if (state == 8){  
       
-      //Calculate commands
-      int lever_command = command % 10;
-      
       lever_drive(lever_command);
-      Serial.write(done);
+      Serial.write("Servo, done");
     }
     
     //Tray change command 
-    else if (state == 0){ 
-      
-      //Calculate commands 
-      int tray_command = (command % 1000000) / 10000;
-      int distance_command = (command % 10000) / 10;
-      
+    else if (state == 1){ 
+
+      Serial.println("Moving tray!");
       tray_drive(tray_command, distance_command);
-      Serial.write(done);
+      Serial.write("Tray, done");
     }
     
     //ERROR
