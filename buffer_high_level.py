@@ -16,9 +16,7 @@ Run this file to control the low level
 Microcontrollers (Arduino Nanos) which in turn control the hardware.
 This file has following classes:
 MainBuffer
-NanoUsb(port(optional, preset to /dev/ttyUSB0), baud(optional, preset to 115200)
-https://roboticsbackend.com/raspberry-pi-gpio-interrupts-tutorial/
-
+Imports usbCommunication from Autoplant/Gantry (Credit: Philip)
 """
 
 
@@ -80,31 +78,32 @@ class BufferControl(usbCommunication):
     TODO Ask Mattias how to assign "workers" to a function (would be neat to use!!!)
     If both trays are ready, use tray 1
     """
-    def __init__(self, arduino_port):
-        super().__init__(arduino_port, 115200)
+    def __init__(self, arduino_port="/dev/ttyACM0"):
+        # super().__init__(arduino_port, 115200)
         """
-        :param arduino_port:
+        :param arduino_port: port ID for the arduino device
+        :type arduino_port: String 
         """
-
-        self.sendMessage_array = 0
-        self.read_array = 0
+        baudRate = 115200
+        print(baudRate)
+        self.message = None
+        self.ser = serial.Serial(arduino_port, baudRate, timeout=1)
         self.tray_ready = False
         self.tray_position = 0
         self.tray_id = 1
-        # 0 is initial position, 1 means tray is in position to drop plant from cup 1
+        # 0 is initial position, stores position as states
         self.move_ready = False
         # When True, a tray has reached the restock zone and is in waiting state
-        self.nano_return_int = 111
-        self.tray_position_restock = 1
         self.restock_counter = 0
         self.plant_in_cup = [0,0,0,0,0]
+        print("Check 1")
         """
         Below: Old Variables
         """
-        self.sensor_pin = 20
-        self.GPIO = GPIO
-        self.GPIO.setmode(self.GPIO.BCM)
-        self.GPIO.setup(self.sensor_pin, self.GPIO.IN, pull_up_down=self.GPIO.PUD_UP)
+        # self.sensor_pin = 20
+        # self.GPIO = GPIO
+        # self.GPIO.setmode(self.GPIO.BCM)
+        # self.GPIO.setup(self.sensor_pin, self.GPIO.IN, pull_up_down=self.GPIO.PUD_UP)
         # Setup the thread sensor interrupts to appropriate sensor pin
         # self.GPIO.add_event_detect(self.sensor_pin, self.GPIO.BOTH,
         #                            callback=self.sensor_interrupt_callback(), bouncetime=50)
@@ -113,15 +112,36 @@ class BufferControl(usbCommunication):
                                  filemode="w", format='%(name)s - %(levelname)s - %(message)s '
                                                       '-%(asctime)s - %(message)s', datefmt='%d-%b-%y %H:%M:%S')
         self.logging.debug("Started high level buffer thread")
+        print("Check Pre")
         self.move_tray_init()
-        self.sendMessage("111")
-        # self.sendMessage(1,1)
+        print("Check End")
+
+        
+
+	#Input: #z100 for z 100mm down. z-100 for 100mm up
+	# Homing: send "home"
+    def sendMessage(self, msg):
+        self.ser.write(msg.encode('utf-8')) 
+
+	#Output: Confirms whats has been sent
+	# if input NOT understood it reports that aswell
+    def readMessage(self):
+        self.message = self.ser.readline().decode('utf-8').rstrip()
+        print(self.message)
+        return self.message
+
+    def messageRecieved(self):
+        if(self.ser.in_waiting > 0):
+            return True
+        else:
+            return False
 
     def move_tray_init(self, input_var=True):
-        # TODO replace with correct ints
-        self.sendMessage("100")
-        # function to move tray to restock position
-        self.read()
+        msg = "100"
+        self.sendMessage(msg)
+        print("Performing Homing")
+        time.sleep(0.5)
+        self.readMessage()
         self.tray_position = 0
         # Assigns tray position variable to init position
         self.tray_ready = input_var
@@ -311,14 +331,6 @@ class BufferControl(usbCommunication):
         # This Function should move tray two from drop-off zone and back
         pass
 
-    def read(self):
-        while True:
-            read = self.readMessage()
-            time.sleep(0.1)
-            if read == self.nano_return_int:
-                break
-        return read
-
     def trees_dropped(self, tray_number=None):
         self.tray_ready = False
 
@@ -330,7 +342,7 @@ class BufferControl(usbCommunication):
         and an int (1 or 2) that corresponds to the position of the tray.
         When False a None type object is the second return parameter.
         """
-        return self.tray_ready, self.tray_position_restock
+        return self.tray_ready
 
     def sensor_interrupt_callback(self):
         print("Sensor Triggered")
@@ -340,7 +352,8 @@ class BufferControl(usbCommunication):
     #     raise EmergencyInterruptException()
 
 
+
 if __name__ == '__main__':
     Buffer_Control = BufferControl("/dev/ttyACM0")
-    # Start state machine
-    Buffer_Control.state_machine()
+    # Buffer_Control.state_machine()
+
