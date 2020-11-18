@@ -71,7 +71,7 @@ class NoTrayReadyException(Exception):
     pass
 
 
-class BufferControl(usbCommunication):
+class BufferControl():
     """
     This class deals with overall workings and logics for the buffer system
     Call this class to create one thread for one buffer tray system(?)
@@ -91,6 +91,7 @@ class BufferControl(usbCommunication):
         self.tray_ready = False
         self.tray_position = 0
         self.tray_id = 1
+        self.state = 0
         # 0 is initial position, stores position as states
         self.move_ready = False
         # When True, a tray has reached the restock zone and is in waiting state
@@ -240,6 +241,31 @@ class BufferControl(usbCommunication):
                 self.move_tray_to_end()
             if state == 20:
                 self.move_tray_init()
+                
+    def current_state(self):
+        self.sendMessage("103")
+        return_data = []
+        return_data = self.readMessage()
+        data_formated = return_data[2:]
+        data = float(data_formated)
+        self.tray_position = data
+        if self.tray_position < 0 and self.tray_position < 123:
+            self.state = 1
+        elif self.tray_position < 0 and self.tray_position < 123:
+            self.state = 2
+        elif self.tray_position < 0 and self.tray_position < 123:
+            self.state = 3
+        elif self.tray_position < 0 and self.tray_position < 123:
+            self.state = 4
+        elif self.tray_position < 0 and self.tray_position < 123:
+            self.state = 5
+        elif self.tray_position < 0 and self.tray_position < 123:
+            self.state = 6
+        else:
+            self.state = 8
+            self.logging.error = ("No tray position withint boundaries, tray position returned as %s" 
+                                  % self.tray_position)
+        return self.state, self.tray_position
 
     def check_plants(self):
         """Writes 06 to arduino
@@ -249,7 +275,7 @@ class BufferControl(usbCommunication):
         """
         self.sendMessage("106")
         output_array = []
-        data = self.read()
+        data = self.readMessage()
         for i in range(len(data)):
             output_array.append(data)
         if output_array[0] == 6:
