@@ -8,6 +8,9 @@ const int stepPin = 3;
 const int dirPin = 2; 
 const int switchPin = 7;
 
+int tray_drive(int, int);
+int lever_drive(int);
+int getDistance(int);
 
 const int done = 999;
 const int error = 666;
@@ -22,6 +25,7 @@ const int wait = 550; //(RPM*200)/(60*1000000). This sets the wait between outpu
 static int new_pos;
 static int cur_pos_case;
 static int cur_pos_mm;
+static bool lever_up;
 
 //---------------------------------------------------SETUP-----------------------------------------------------
 void setup() {
@@ -38,7 +42,8 @@ void setup() {
 //---------------------------------------------INITIATION/HOMING------------------------------------------------
 void initiate(){
   
-  analogWrite(leverPin, 19);
+  lever.write(95);
+  lever_up = false;
   
   //This continously runs the motor, one step at a time, untill the homing switch is reached. 
   digitalWrite(dirPin,LOW);
@@ -50,79 +55,79 @@ void initiate(){
     delayMicroseconds(wait);
     if (digitalRead(switchPin) == HIGH){
       delay(50);
-      Serial.println("Switch triggered");
       delay(1000);
       break;
     }
   }
   cur_pos_mm = 0;
-  Serial.println("Homing completed");
 }
 
 //----------------------------------------MOVE TRAY---------------------------------------------
-void tray_drive(int position, int prev_distance_mm){ 
+int tray_drive(int position, int prev_distance_mm){ 
 
-  int travel_mm, steg;
+int travel_mm, steg;
+int fatal = 0;
+
+if (lever_up){
+  fatal = 1;}
+
+else{
   
   int position_mm = getDistance(position);
   if (position_mm > travel_limit_mm){
-      Serial.print("error");
+      fatal = 1;
     }
-
+    
+  travel_mm = position_mm - (cur_pos_mm - prev_distance_mm);
   if (abs(travel_mm + cur_pos_mm) < travel_limit_mm){
     
-    travel_mm = position_mm - (cur_pos_mm - prev_distance_mm);
     steg = (travel_mm)*33.33333;
-    Serial.println(position_mm);
-    Serial.println(travel_mm);
-    Serial.println(steg);
-
-    //Set direction. 
+    
     if (travel_mm > 0){
-      digitalWrite(dirPin,HIGH);
-    }
+      digitalWrite(dirPin,HIGH);}
     else{
-      digitalWrite(dirPin,LOW);
-    } 
+      digitalWrite(dirPin,LOW);} 
 
-    // Makes 200 pulses for making one full rotation (1.8deg/step)
     int check = 0;
-     
     for(int x = 0; x < abs(steg); x++){
+      
       digitalWrite(stepPin,HIGH); 
       delayMicroseconds(wait); 
       digitalWrite(stepPin,LOW); 
       delayMicroseconds(wait);
 
-      if (switchPin == HIGH){
-        Serial.println("FATAL");
-        break;
-      }
+      if (digitalRead(switchPin) == HIGH){
+        delay(50);
+        fatal = 1;
+        delay(1000);
+        break;}
     
       check++;
       //Writes to Rpi 10 times every rotation = every 0.6mm
       if (check == 20){
-        Serial.print(1);
-        check = 0; 
-      } 
-    }
-    
-    cur_pos_mm = position_mm;
-    Serial.println();
-    Serial.println("Current position: ");
-    Serial.println(cur_pos_mm);      
-    delay(100); // 0.1 second delay
-  }
+        //Serial.print(1);
+        check = 0;} }
+
+
+    if (fatal == 0){
+      cur_pos_mm = position_mm;    
+      delay(100);}} // 0.1 second delay}}
+
   
   else{
-    Serial.print("error, max limit in distance exceeded");
-  }
+    fatal = 1;}
+}
+
+  return fatal;
+
 }
 
 //-----------------------------------------MOVE LEVER---------------------------------------
-void lever_drive(int lever_command){
-  
-  int value; 
+int lever_drive(int lever_command){
+
+  int fatal = 0;
+  int value = 0; 
+  lever_up = false;
   switch (lever_command){
     case 1:
       value = 95;
@@ -135,14 +140,20 @@ void lever_drive(int lever_command){
       break;
     case 4: 
       value = 30;
+      lever_up = true;
       break;
     case 5:
       value = 170;
+      lever_up = true;
       break;
   }
-
-  lever.write(value);
-  
+  if (value == 0){
+    fatal = 1;
+    }
+  else{
+    lever.write(value);
+  }
+  return fatal;
 }
 
 //-------------------------------------GET DISTANCE IN MM------------------------------------
@@ -186,9 +197,7 @@ void loop() {
   
   if (Serial.available()>0){
     
-    Serial.println("command received:");
     str_command = Serial.readStringUntil("/r");
-    Serial.println(str_command);
     int_command = str_command.toInt();
 
     int state = int_command/1000000;
@@ -198,9 +207,8 @@ void loop() {
     
     //initiation command
     if (state == 0){
-      Serial.println("Initiating");  
       initiate(); 
-      //Serial.print("done");
+      Serial.println(done);
     }
     
     //Position Query
@@ -210,27 +218,30 @@ void loop() {
     
     //Sensor query
     else if (state == 7){ 
-      Serial.write("Query: sensor");
+      Serial.println(done);
     }
     
     //Lever change command
     else if (state == 8){  
-      
-      lever_drive(lever_command);
-      Serial.write("Servo, done");
+      if (lever_drive(lever_command)==1){
+        Serial.println(error);}
+      else{
+        Serial.println(done);}
     }
     
     //Tray change command 
     else if (state == 1){ 
-
-      Serial.println("Moving tray!");
-      tray_drive(tray_command, distance_command);
-      Serial.write("Tray, done");
+      if (tray_drive(tray_command, distance_command)==1){
+        Serial.println(error);
+        }
+      else{
+        Serial.println(done);
+        }
     }
     
     //ERROR
     else{
-      Serial.write(error);
+      Serial.println(error);
     }
     
   }
