@@ -84,9 +84,13 @@ class BufferControl():
         :param arduino_port: port ID for the arduino device
         :type arduino_port: String 
         """
-        baudRate = 115200
+        baudRate = 9600
         self.message = None
         self.ser = serial.Serial(arduino_port, baudRate, timeout=1)
+        com_open =  self.ser.is_open
+        if com_open:
+            print("open")
+        time.sleep(6)
         self.tray_ready = False
         self.tray_position = 0
         self.tray_id = 1
@@ -108,15 +112,13 @@ class BufferControl():
                                  filemode="w", format='%(name)s - %(levelname)s - %(message)s '
                                                       '-%(asctime)s - %(message)s', datefmt='%d-%b-%y %H:%M:%S')
         self.logging.debug("Started high level buffer thread")
-        print("Check Pre")
         self.move_tray_init()
-        print("Check End")
 
     def sendMessage(self, msg):
         self.ser.write(msg.encode('utf-8')) 
 
     def readMessage(self):
-        self.message = self.ser.readline().decode('utf-8').rstrip()
+        self.message = self.ser.readline()#.decode('utf-8').rstrip()
         print(self.message)
         return self.message
 
@@ -133,114 +135,115 @@ class BufferControl():
         Args:
             input_var (bool, optional): [description]. Defaults to True.
         """
-        msg = "123"
-        self.sendMessage(str(123))
-        time.sleep(0.5)
-        print(self.readMessage())
+        msg = "0000000"
         self.sendMessage(msg)
-        print(self.readMessage())
-        time.sleep(1)
-        if self.messageRecieved:
-            print("Waiting Message is: %s" % self.readMessage())
-        # self.sendMessage(input("123"))
-        # time.sleep(0.5)
-        # print(self.readMessage())
         self.tray_position = 0
         # Assigns tray position variable to init position
         self.tray_ready = input_var
+        self.ser.reset_input_buffer()
+        # time.sleep(5)
+        # self.sendMessage("8000001")
         # tray_ready variable is True, (for is_ready function call)
 
     def state_machine(self):
         """[Buffer System state machine function to control the system logic]
         """
+        while True:
+            self.move_tray_state_one()
+            time.sleep(5)
+            self.move_tray_state_two()
+            time.sleep(5)
+            self.move_tray_state_three()
+            time.sleep(5)
+            print("loop rerun")
+            
+        # if self.tray_ready:
+        #     counter = 0
+        #     self.check_plants()
+        #     for i in range(len(self.plant_in_cup)):
+        #         if self.plant_in_cup[i] == 1:
+        #             counter = counter + 1
+        #     if counter == 5:
+        #         state = 1
+        #         self.logging.debug("5 Plants were found after restock")
+        #     elif counter == 0:
+        #         state = 20
+        #         self.logging.error("No plants were found after restock. Tray will perform reset")
+        #     else:
+        #         state = 1
+        #         self.logging.warning("5 Plants were not found after restock, "
+        #                              "%d Plants were found in tray" % counter)
+        #     if state == 2:
+        #         self.move_tray_state_one()
+        #         self.tray_position = self.check_position()
+        #         # if (self.tray_position < 800) and (self.tray_position > 700) and (self.plant_in_cup[0] == 1):
+        #         self.open_tray()
+        #         self.tray_position = self.check_position()
 
-        if self.tray_ready:
-            counter = 0
-            self.check_plants()
-            for i in range(len(self.plant_in_cup)):
-                if self.plant_in_cup[i] == 1:
-                    counter = counter + 1
-            if counter == 5:
-                state = 1
-                self.logging.debug("5 Plants were found after restock")
-            elif counter == 0:
-                state = 20
-                self.logging.error("No plants were found after restock. Tray will perform reset")
-            else:
-                state = 1
-                self.logging.warning("5 Plants were not found after restock, "
-                                     "%d Plants were found in tray" % counter)
-            if state == 2:
-                self.move_tray_state_one()
-                self.tray_position = self.check_position()
-                # if (self.tray_position < 800) and (self.tray_position > 700) and (self.plant_in_cup[0] == 1):
-                self.open_tray()
-                self.tray_position = self.check_position()
-
-            if state == 4:
-                self.move_tray_state_two()
-                self.open_tray()
-                # self.tray_position = self.check_position()
-                # if (self.tray_position < 600) and (self.tray_position > 500):
-                self.check_plants()
-                while self.plant_in_cup[1] == 1:
-                    self.check_plants()
-                    if self.plant_in_cup[1] == 0:
-                        state = 5
-                    elif self.plant_in_cup[1] == 1:
-                        self.open_tray()
-                else:
-                    # TODO Write to arduino to move to position
-                    pass
-            if state == 5:
-                self.move_tray_state_three()
-                self.open_tray()
-                self.tray_position = self.check_position()
-                # if (self.tray_position < 500) and (self.tray_position > 400):
-                self.check_plants()
-                while self.plant_in_cup[2] == 1:
-                    self.check_plants()
-                    if self.plant_in_cup[2] == 0:
-                        state = 6
-                    elif self.plant_in_cup[2] == 1:
-                        self.open_tray()
-                else:
-                    # TODO Write to arduino to move to position 3
-                    pass
-            if state == 6:
-                self.move_tray_state_four()
-                self.open_tray()
-                self.tray_position = self.check_position()
-                # if (self.tray_position < 400) and (self.tray_position > 300):
-                self.check_plants()
-                while self.plant_in_cup[3] == 1:
-                    self.check_plants()
-                    if self.plant_in_cup[3] == 0:
-                        state = 7
-                    elif self.plant_in_cup[3] == 1:
-                        self.open_tray()
-                else:
-                    # TODO Write to arduino to move to position 4
-                    pass
-            if state == 7:
-                self.move_tray_state_five()
-                self.open_tray()
-                self.tray_position = self.check_position()
-                # if (self.tray_position < 300) and (self.tray_position > 200):
-                self.check_plants()
-                while self.plant_in_cup[4] == 1:
-                    self.check_plants()
-                    if self.plant_in_cup[4] == 0:
-                        state = 8
-                    elif self.plant_in_cup[4] == 1:
-                        self.open_tray()
-                else:
-                    # TODO Write to arduino to move to position 5
-                    pass
-            if state == 8:
-                self.move_tray_to_end()
-            if state == 20:
-                self.move_tray_init()
+        #     if state == 4:
+        #         self.move_tray_state_two()
+        #         self.open_tray()
+        #         # self.tray_position = self.check_position()
+        #         # if (self.tray_position < 600) and (self.tray_position > 500):
+        #         self.check_plants()
+        #         while self.plant_in_cup[1] == 1:
+        #             self.check_plants()
+        #             if self.plant_in_cup[1] == 0:
+        #                 state = 5
+        #             elif self.plant_in_cup[1] == 1:
+        #                 self.open_tray()
+        #         else:
+        #             # TODO Write to arduino to move to position
+        #             pass
+        #     if state == 5:
+        #         self.move_tray_state_three()
+        #         self.open_tray()
+        #         self.tray_position = self.check_position()
+        #         # if (self.tray_position < 500) and (self.tray_position > 400):
+        #         self.check_plants()
+        #         while self.plant_in_cup[2] == 1:
+        #             self.check_plants()
+        #             if self.plant_in_cup[2] == 0:
+        #                 state = 6
+        #             elif self.plant_in_cup[2] == 1:
+        #                 self.open_tray()
+        #         else:
+        #             # TODO Write to arduino to move to position 3
+        #             pass
+        #     if state == 6:
+        #         self.move_tray_state_four()
+        #         self.open_tray()
+        #         self.tray_position = self.check_position()
+        #         # if (self.tray_position < 400) and (self.tray_position > 300):
+        #         self.check_plants()
+        #         while self.plant_in_cup[3] == 1:
+        #             self.check_plants()
+        #             if self.plant_in_cup[3] == 0:
+        #                 state = 7
+        #             elif self.plant_in_cup[3] == 1:
+        #                 self.open_tray()
+        #         else:
+        #             # TODO Write to arduino to move to position 4
+        #             pass
+        #     if state == 7:
+        #         self.move_tray_state_five()
+        #         self.open_tray()
+        #         self.tray_position = self.check_position()
+        #         # if (self.tray_position < 300) and (self.tray_position > 200):
+        #         self.check_plants()
+        #         while self.plant_in_cup[4] == 1:
+        #             self.check_plants()
+        #             if self.plant_in_cup[4] == 0:
+        #                 state = 8
+        #             elif self.plant_in_cup[4] == 1:
+        #                 self.open_tray()
+        #         else:
+        #             # TODO Write to arduino to move to position 5
+        #             pass
+        #     if state == 8:
+        #         self.move_tray_to_end()
+        #     if state == 20:
+        #         self.move_tray_init()
                 
     def current_state(self):
         """[Call this function to check the current state and position of the tray]
@@ -319,47 +322,99 @@ class BufferControl():
     def move_tray_state_one(self):
         """[Move tray to state one]
         """
-        self.sendMessage("111")
+        self.sendMessage("1110000")
         waiting_for_finish = True
         while waiting_for_finish:
-            waiting_for_finish = self.readMessage()
+            return_data = self.readMessage()
+            if return_data == "999" or return_data == "999":
+                waiting_for_finish = False
+            elif return_data == "666" or return_data == "666":
+                pass
+                # raise NoTrayReadyException
+            else:
+                pass
+            time.sleep(0.1)
+                
 
     def move_tray_state_two(self):
         """[Move tray to state two]
         """
-        self.sendMessage("112")
+        self.sendMessage("1210000")
         waiting_for_finish = True
         while waiting_for_finish:
-            waiting_for_finish = self.read()
+            return_data = self.readMessage()
+            if return_data == "999" or return_data == "999":
+                waiting_for_finish = False
+            elif return_data == "666" or return_data == "666":
+                waiting_for_finish = False
+                # raise NoTrayReadyException
+            else:
+                pass
+            time.sleep(0.1)
 
     def move_tray_state_three(self):
         """[Move tray to state three]
         """
-        self.sendMessage("112")
+        self.sendMessage("1310000")
         waiting_for_finish = True
         while waiting_for_finish:
-            waiting_for_finish = self.read()
+            return_data = self.readMessage()
+            if return_data == "999" or return_data == "999":
+                waiting_for_finish = False
+            elif return_data == "666" or return_data == "666":
+                pass
+                # raise NoTrayReadyException
+            else:
+                pass
+            time.sleep(0.1)
 
     def move_tray_state_four(self):
         """[Move tray to state four]
         """
-        self.sendMessage("114")
+        self.sendMessage("1410000")
         waiting_for_finish = True
         while waiting_for_finish:
-            waiting_for_finish = self.readMessage()
+            return_data = self.readMessage()
+            if return_data == "999" or return_data == "999":
+                waiting_for_finish = False
+            elif return_data == "666" or return_data == "666":
+                pass
+                # raise NoTrayReadyException
+            else:
+                pass
+            time.sleep(0.1)
 
     def move_tray_state_five(self):
         """[Move tray to state five]
         """
-        self.sendMessage("115")
+        self.sendMessage("1310000")
         waiting_for_finish = True
         while waiting_for_finish:
-            waiting_for_finish = self.readMessage()
+            return_data = self.readMessage()
+            if return_data == "999" or return_data == "999":
+                waiting_for_finish = False
+            elif return_data == "666" or return_data == "666":
+                pass
+                # raise NoTrayReadyException
+            else:
+                pass
+            time.sleep(0.1)
 
-    def move_tray_to_start(self):
-        """[Move tray to start position]
+    def move_tray_to_pickup(self):
+        """[Move tray to pickup position]
         """
-        self.sendMessage("110")
+        self.sendMessage("1010000")
+        waiting_for_finish = True
+        while waiting_for_finish:
+            return_data = self.readMessage()
+            if return_data == "999" or return_data == "999":
+                waiting_for_finish = False
+            elif return_data == "666" or return_data == "666":
+                pass
+                # raise NoTrayReadyException
+            else:
+                pass
+            time.sleep(0.1)
 
     def start_tray_two(self):
         # This Function should move tray two from drop-off zone and back
@@ -393,6 +448,6 @@ class BufferControl():
 
 
 if __name__ == '__main__':
-    Buffer_Control = BufferControl("/dev/ttyUSB0")
-    # Buffer_Control.state_machine()
+    Buffer_Control = BufferControl("/dev/ttyACM0")
+    Buffer_Control.state_machine()
 
