@@ -11,7 +11,7 @@ import time
 
 class usbCommunication():
     def __init__(self, port, baudRate):
-        port = '/dev/ttyACM0'
+        # port = '/dev/ttyACM0'
         baudRate = 115200
         print(baudRate)
         self.message = None
@@ -28,7 +28,7 @@ class usbCommunication():
 	#Output: Confirms whats has been sent
 	# if input NOT understood it reports that aswell
     def readMessage(self):
-        self.message = self.ser.readline().decode('utf-8').rstrip()
+        self.message = self.ser.readline().decode('ascii')#.rstrip()
         print(self.message)
         return self.message
 
@@ -38,7 +38,7 @@ class usbCommunication():
         else:
             return False
 if __name__ == "__main__":
-    zAxisUsbPort = '/dev/ttyACM0'
+    zAxisUsbPort = '/dev/ttyUSB0'
 
     test = usbCommunication(zAxisUsbPort, 115200)
 

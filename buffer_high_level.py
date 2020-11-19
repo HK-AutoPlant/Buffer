@@ -85,7 +85,6 @@ class BufferControl():
         :type arduino_port: String 
         """
         baudRate = 115200
-        print(baudRate)
         self.message = None
         self.ser = serial.Serial(arduino_port, baudRate, timeout=1)
         self.tray_ready = False
@@ -97,10 +96,6 @@ class BufferControl():
         # When True, a tray has reached the restock zone and is in waiting state
         self.restock_counter = 0
         self.plant_in_cup = [0,0,0,0,0]
-        print("Check 1")
-        """
-        Below: Old Variables
-        """
         # self.sensor_pin = 20
         # self.GPIO = GPIO
         # self.GPIO.setmode(self.GPIO.BCM)
@@ -117,15 +112,9 @@ class BufferControl():
         self.move_tray_init()
         print("Check End")
 
-        
-
-	#Input: #z100 for z 100mm down. z-100 for 100mm up
-	# Homing: send "home"
     def sendMessage(self, msg):
         self.ser.write(msg.encode('utf-8')) 
 
-	#Output: Confirms whats has been sent
-	# if input NOT understood it reports that aswell
     def readMessage(self):
         self.message = self.ser.readline().decode('utf-8').rstrip()
         print(self.message)
@@ -138,22 +127,33 @@ class BufferControl():
             return False
 
     def move_tray_init(self, input_var=True):
-        msg = "100"
-        self.sendMessage(msg)
-        print("Performing Homing")
+        """[Function to perform homing, or move tray to initial
+        position]
+
+        Args:
+            input_var (bool, optional): [description]. Defaults to True.
+        """
+        msg = "123"
+        self.sendMessage(str(123))
         time.sleep(0.5)
-        self.readMessage()
+        print(self.readMessage())
+        self.sendMessage(msg)
+        print(self.readMessage())
+        time.sleep(1)
+        if self.messageRecieved:
+            print("Waiting Message is: %s" % self.readMessage())
+        # self.sendMessage(input("123"))
+        # time.sleep(0.5)
+        # print(self.readMessage())
         self.tray_position = 0
         # Assigns tray position variable to init position
         self.tray_ready = input_var
         # tray_ready variable is True, (for is_ready function call)
 
     def state_machine(self):
+        """[Buffer System state machine function to control the system logic]
         """
-        Buffer State Machine
-        Calls a function for each state
-        :return:
-        """
+
         if self.tray_ready:
             counter = 0
             self.check_plants()
@@ -243,6 +243,11 @@ class BufferControl():
                 self.move_tray_init()
                 
     def current_state(self):
+        """[Call this function to check the current state and position of the tray]
+
+        Returns:
+            [int, float]: [the state and the position in mm]
+        """
         self.sendMessage("103")
         return_data = []
         return_data = self.readMessage()
@@ -268,10 +273,10 @@ class BufferControl():
         return self.state, self.tray_position
 
     def check_plants(self):
-        """Writes 06 to arduino
-        Reads out header + 5 digits
-        If message header is 6, stores plant in cup as 1 (in cup) | 0 (not in cup)
-        :return: array 5 spots
+        """[This function query sensor data from arduino for the plants if in cup]
+
+        Returns:
+            [Array]: [An array of length 5 with 0 or 1 for no plant or a plant]
         """
         self.sendMessage("106")
         output_array = []
@@ -283,6 +288,11 @@ class BufferControl():
         return output_array
 
     def check_position(self):
+        """[summary]
+
+        Returns:
+            [type]: [description]
+        """
         self.sendMessage(107)
         output_array = []
         data = self.readMessage()
@@ -293,27 +303,29 @@ class BufferControl():
         return output_array
 
     def move_tray_to_end(self):
+        """[Move tray to init position, possibly not needed]
+        """
         self.move_tray_init(False)
 
-    def open_tray(self):
-        #self.sendMessage(1,2,3)
-        #
+    def open_tray(self, direction):
+        """[This functions opens the cup]
+
+        Args:
+            direction ([String | Int]): [Identifier necessary for knowing which direction to open]
+        """
+        #TODO Add code when motor installed? 
         self.logging.debug("There is no motor for this finished")
 
     def move_tray_state_one(self):
-        """
-        Moves a tray to first drop off position one
-        :return: 
+        """[Move tray to state one]
         """
         self.sendMessage("111")
         waiting_for_finish = True
         while waiting_for_finish:
-            waiting_for_finish = self.read()
+            waiting_for_finish = self.readMessage()
 
     def move_tray_state_two(self):
-        """
-        Moves a tray to first drop off position one
-        :return: 
+        """[Move tray to state two]
         """
         self.sendMessage("112")
         waiting_for_finish = True
@@ -321,9 +333,7 @@ class BufferControl():
             waiting_for_finish = self.read()
 
     def move_tray_state_three(self):
-        """
-        Moves a tray to first drop off position one
-        :return: 
+        """[Move tray to state three]
         """
         self.sendMessage("112")
         waiting_for_finish = True
@@ -331,9 +341,7 @@ class BufferControl():
             waiting_for_finish = self.read()
 
     def move_tray_state_four(self):
-        """
-        Moves a tray to first drop off position one
-        :return: 
+        """[Move tray to state four]
         """
         self.sendMessage("114")
         waiting_for_finish = True
@@ -341,9 +349,7 @@ class BufferControl():
             waiting_for_finish = self.readMessage()
 
     def move_tray_state_five(self):
-        """
-        Moves a tray to first drop off position one
-        :return: 
+        """[Move tray to state five]
         """
         self.sendMessage("115")
         waiting_for_finish = True
@@ -351,6 +357,8 @@ class BufferControl():
             waiting_for_finish = self.readMessage()
 
     def move_tray_to_start(self):
+        """[Move tray to start position]
+        """
         self.sendMessage("110")
 
     def start_tray_two(self):
@@ -358,28 +366,33 @@ class BufferControl():
         pass
 
     def trees_dropped(self, tray_number=None):
+        """[If trees have been dropped off, tray is not ready, initiate state machine]
+
+        Args:
+            tray_number ([int], optional): [tray identifier]. Defaults to None.
+        """
         self.tray_ready = False
+        self.state_machine()
 
     def is_ready(self):
-        """
-        Callable function that will tell you if a tray is ready or not,
-        :return: True | False & None
-        The function returns true if a tray is ready to receive plants
-        and an int (1 or 2) that corresponds to the position of the tray.
-        When False a None type object is the second return parameter.
+        """[Gripper API, call this when plants are dropped off]
+
+        Returns:
+            [bool]: [Not sure if this is necessary]
         """
         return self.tray_ready
 
     def sensor_interrupt_callback(self):
+        """[This function can be called for performing interrupt sequence]
+        """
         print("Sensor Triggered")
-    #
-    #     # TODO After performing system reset, send a wait to gripper/gantry
-    #     # TODO After an entire rerun of the tray has been performed, stop wait
-    #     raise EmergencyInterruptException()
+        # TODO After performing system reset, send a wait to gripper/gantry
+        # TODO After an entire rerun of the tray has been performed, stop wait
+        raise EmergencyInterruptException()
 
 
 
 if __name__ == '__main__':
-    Buffer_Control = BufferControl("/dev/ttyACM0")
+    Buffer_Control = BufferControl("/dev/ttyUSB0")
     # Buffer_Control.state_machine()
 
