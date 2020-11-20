@@ -281,7 +281,7 @@ class BufferControl():
         Returns:
             [Array]: [An array of length 5 with 0 or 1 for no plant or a plant]
         """
-        self.sendMessage("106")
+        self.sendMessage("6000000")
         output_array = []
         data = self.readMessage()
         for i in range(len(data)):
@@ -296,7 +296,7 @@ class BufferControl():
         Returns:
             [type]: [description]
         """
-        self.sendMessage(107)
+        self.sendMessage("7000000")
         output_array = []
         data = self.readMessage()
         for i in range(len(data)):
@@ -305,11 +305,6 @@ class BufferControl():
             output_array = output_array[1:]
         return output_array
 
-    def move_tray_to_end(self):
-        """[Move tray to init position, possibly not needed]
-        """
-        self.move_tray_init(False)
-
     def open_tray(self, direction):
         """[This functions opens the cup]
 
@@ -317,6 +312,12 @@ class BufferControl():
             direction ([String | Int]): [Identifier necessary for knowing which direction to open]
         """
         #TODO Add code when motor installed? 
+        if (direction % 2) == 0:
+            self.sendMessage("8000005")
+            # since its even, move to open tray two
+        if (direction % 2 ) == 1:
+            self.sendMessage("8000001")
+            # since its odd, move to open tray one
         self.logging.debug("There is no motor for this finished")
 
     def move_tray_state_one(self):
@@ -400,8 +401,8 @@ class BufferControl():
                 pass
             time.sleep(0.1)
 
-    def move_tray_to_pickup(self):
-        """[Move tray to pickup position]
+    def move_tray_to_restock(self):
+        """[Move tray to restock position]
         """
         self.sendMessage("1010000")
         waiting_for_finish = True
