@@ -37,13 +37,14 @@ class usbCommunication():
         else:
             return False
 if __name__ == "__main__":
-    zAxisUsbPort = '/dev/ttyUSB1'
+    zAxisUsbPort = '/dev/ttyACM0'
 
     test = usbCommunication(zAxisUsbPort, 115200)
     while True:
         msg = input("Input Command: ")
+        test.ser.reset_input_buffer()
         test.sendMessage(msg)
-        test.readMessage()
+        test.ser.reset_output_buffer()
         time.sleep(0.5)
         waiting = True
         while waiting:

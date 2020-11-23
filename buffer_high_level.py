@@ -2,9 +2,6 @@
 
 import serial
 import time
-import signal
-import sys
-import threading
 import RPi.GPIO as GPIO
 import logging
 from SC import usbCommunication
@@ -84,7 +81,7 @@ class BufferControl():
         :param arduino_port: port ID for the arduino device
         :type arduino_port: String 
         """
-        baudRate = 9600
+        baudRate = 115200
         self.message = None
         self.ser = serial.Serial(arduino_port, baudRate, timeout=1)
         com_open =  self.ser.is_open
@@ -112,13 +109,15 @@ class BufferControl():
                                  filemode="w", format='%(name)s - %(levelname)s - %(message)s '
                                                       '-%(asctime)s - %(message)s', datefmt='%d-%b-%y %H:%M:%S')
         self.logging.debug("Started high level buffer thread")
-        self.move_tray_init()
+        # self.move_tray_init()
 
     def sendMessage(self, msg):
+        self.ser.reset_input_buffer()
         self.ser.write(msg.encode('utf-8')) 
 
     def readMessage(self):
-        self.message = self.ser.readline()#.decode('utf-8').rstrip()
+        self.ser.reset_output_buffer()
+        self.message = self.ser.readline().decode('utf-8').rstrip()
         print(self.message)
         return self.message
 
@@ -140,7 +139,7 @@ class BufferControl():
         self.tray_position = 0
         # Assigns tray position variable to init position
         self.tray_ready = input_var
-        self.ser.reset_input_buffer()
+        # self.ser.reset_input_buffer()
         # time.sleep(5)
         # self.sendMessage("8000001")
         # tray_ready variable is True, (for is_ready function call)

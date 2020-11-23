@@ -6,12 +6,13 @@ class randomnameClass():
         self.comm = usbCommunication(arduino_port, 115200)
         
     def test_message(self):
-        msg = input("Input message: ")
-        self.comm.sendMessage(msg)
+        msg = "123" # input("Input message: ")
+        self.comm.sendMessage(str(msg.rstrip()))
         print("something is sent")
-        time.sleep(0.5)
+        time.sleep(1)
         print("Message return: %s" % self.comm.readMessage())
 
 if __name__ == "__main__":
     testing = randomnameClass()
+    time.sleep(1)
     testing.test_message()
