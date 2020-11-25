@@ -94,7 +94,7 @@ int tray_drive(int position, int prev_distance_mm){
       digitalWrite(stepPin,LOW); 
       delayMicroseconds(wait);
 
-      if (digitalRead(switchPin) == HIGH){
+      if (digitalRead(switchPin) == HIGH and cur_pos_mm > 0){
         fatal = 1;
         break;
       }
