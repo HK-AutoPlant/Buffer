@@ -3,10 +3,12 @@ Servo lever;
 
 // define pins on the Arduino nano board. 
 const int motor = 1; //Motor 1 or 2 
-const int leverPin = 9; //PWM pins on nano: 3, 9, 10, 11. 
-const int stepPin = 3;  
-const int dirPin = 2; 
-const int switchPin = 7;
+const int leverPin = 11; //PWM pins on nano: 3, 9, 10, 11.
+const int Enable = 2; 
+const int stepPin = 4;  
+const int dirPin = 3; 
+const int switchPin = 12
+;
 
 int lever_drive(int);
 int getDistance(int);
@@ -44,7 +46,7 @@ void initiate(){
   lever.write(95);
   
   //This continously runs the motor, one step at a time, untill the homing switch is reached. 
-  digitalWrite(dirPin,LOW);
+  digitalWrite(dirPin,HIGH);
   
   while(1){
     digitalWrite(stepPin,HIGH); 
@@ -77,10 +79,10 @@ int tray_drive(int position, int prev_distance_mm){
 
     //Set direction. 
     if (travel_mm > 0){
-      digitalWrite(dirPin,HIGH);
+      digitalWrite(dirPin,LOW);
     }
     else{
-      digitalWrite(dirPin,LOW);
+      digitalWrite(dirPin,HIGH);
     } 
 
     // Makes 200 pulses for making one full rotation (1.8deg/step)
@@ -92,7 +94,7 @@ int tray_drive(int position, int prev_distance_mm){
       digitalWrite(stepPin,LOW); 
       delayMicroseconds(wait);
 
-      if (switchPin == HIGH){
+      if (digitalRead(switchPin) == HIGH){
         fatal = 1;
         break;
       }
@@ -110,8 +112,7 @@ int tray_drive(int position, int prev_distance_mm){
   }
   
   else{
-    fatal = 1
-  }
+    fatal = 1;}
   return fatal;
 }
 
@@ -123,18 +124,18 @@ int lever_drive(int lever_command){
   
   switch (lever_command){
     case 0:
-      value = 95;
+      value = 90;
       break;
     case 1:
       if (motor == 1){
-        value = 30}
+        value = 0;}
       else{
-        value = 170}
+        value = 180;}
       break;
   }
 
   if (value == 400){
-    fatal = 1}
+    fatal = 1;}
   else{
     lever.write(value);}
   
@@ -178,11 +179,12 @@ void loop() {
   String str_command;
   long int_command;
   
+  
   if (Serial.available()>0){
   
     str_command = Serial.readStringUntil("/r");
     int_command = str_command.toInt();
-    
+    Serial.println(int_command);
     //OLD COMMANDS 
     //int state = int_command/1000000;
     //int tray_command = (int_command % 1000000) / 10000;
@@ -200,34 +202,34 @@ void loop() {
     //initiation command
     if (state == 0){ 
       initiate(); 
-      Serial.write(done);
+      Serial.println(done);
     }
     
     //Position Query
     else if (state == 6){
-      Serial.write(cur_pos_mm);
+      Serial.println(cur_pos_mm);
     }
     
     //Sensor query
     else if (state == 7){ 
-      Serial.write("Query: sensor");
+      Serial.println(done);
     }
     
     //Lever change command
     else if (state == 8){  
       
       if (lever_drive(lever_command) == 1){
-        Serial.write(error);}
+        Serial.println(error);}
       else {
-        Serial.write(done);}
+        Serial.println(done);}
     }
     
     //Tray change command 
     else if (state == 1){ 
       if(tray_drive(tray_command, distance_command) == 1){
-        Serial.write(error);}
+        Serial.println(error);}
       else{
-        Serial.write(new_pos_mm)}
+        Serial.println(done);}
     }
     
     //ERROR
