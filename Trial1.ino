@@ -7,12 +7,12 @@ const int leverPin = 11; //PWM pins on nano: 3, 9, 10, 11.
 const int Enable = 2; 
 const int stepPin = 4;  
 const int dirPin = 3; 
-const int switchPin = 12
-;
+const int switchPin = 12;
 
 int lever_drive(int);
 int getDistance(int);
 int tray_drive(int, int);
+int initiate();
 
 const int done = 999;
 const int error = 666;
@@ -21,7 +21,7 @@ const int travel_limit_mm = 372;
 //Motor and lead screw specifics. 
 const int pitch = 6; //Pitch in mm
 const int RPM = 300; //Expected motor speed in rpm
-const int wait = 550; //(RPM*200)/(60*1000000). This sets the wait between output steps to the stepper motor. A longer wait will mean a slower motor speed. 
+const int wait = 700; //(RPM*200)/(60*1000000). This sets the wait between output steps to the stepper motor. A longer wait will mean a slower motor speed. 
 
 //Tray positions. 
 static int new_pos;
@@ -34,6 +34,9 @@ void setup() {
   pinMode(stepPin,OUTPUT); 
   pinMode(dirPin,OUTPUT);
   pinMode(switchPin,INPUT);
+
+  pinMode(Enable,OUTPUT);
+  digitalWrite(Enable,HIGH);
   //Sets the lever pin as Output
   lever.attach(leverPin);
   // Sets up usb connection to Raspberry Pi 
@@ -41,9 +44,11 @@ void setup() {
 }
 
 //---------------------------------------------INITIATION/HOMING------------------------------------------------
-void initiate(){
-  
-  lever.write(95);
+int initiate(){
+
+  int fatal = 0;
+  lever.write(110);
+  digitalWrite(Enable,LOW);
   
   //This continously runs the motor, one step at a time, untill the homing switch is reached. 
   digitalWrite(dirPin,HIGH);
@@ -54,18 +59,33 @@ void initiate(){
     digitalWrite(stepPin,LOW); 
     delayMicroseconds(wait);
     if (digitalRead(switchPin) == HIGH){
-      delay(50);
       delay(1000);
       break;
     }
   }
-  cur_pos_mm = 0;
+
+  //Move 5mm so that switch is not pushed. 
+  digitalWrite(dirPin,LOW);
+  delay(1000);
+  for(int x = 0; x < 167 ; x++){
+    digitalWrite(stepPin,HIGH); 
+    delayMicroseconds(wait); 
+    digitalWrite(stepPin,LOW); 
+    delayMicroseconds(wait);}
+
+  if (digitalRead(switchPin) == HIGH){
+    fatal = 1;}
+  
+  cur_pos_mm = 5;
+  digitalWrite(Enable,HIGH);
+  return fatal;
 }
 
 //----------------------------------------MOVE TRAY---------------------------------------------
 int tray_drive(int position, int prev_distance_mm){ 
 
   int travel_mm, steg, fatal = 0;
+  digitalWrite(Enable,LOW);
   
   int position_mm = getDistance(position);
   if (position_mm > travel_limit_mm){
@@ -93,8 +113,8 @@ int tray_drive(int position, int prev_distance_mm){
       delayMicroseconds(wait); 
       digitalWrite(stepPin,LOW); 
       delayMicroseconds(wait);
-
-      if (digitalRead(switchPin) == HIGH and cur_pos_mm > 0){
+      
+      if (digitalRead(switchPin) == HIGH){
         fatal = 1;
         break;
       }
@@ -113,6 +133,8 @@ int tray_drive(int position, int prev_distance_mm){
   
   else{
     fatal = 1;}
+
+  digitalWrite(Enable,HIGH);
   return fatal;
 }
 
@@ -124,13 +146,13 @@ int lever_drive(int lever_command){
   
   switch (lever_command){
     case 0:
-      value = 90;
+      value = 110;
       break;
     case 1:
-      if (motor == 1){
+      if (motor == 2){
         value = 0;}
       else{
-        value = 180;}
+        value = 0;}
       break;
   }
 
@@ -201,8 +223,10 @@ void loop() {
       
     //initiation command
     if (state == 0){ 
-      initiate(); 
-      Serial.println(done);
+      if (initiate() == 1){
+        Serial.println(error);}
+      else {
+        Serial.println(done);}
     }
     
     //Position Query
