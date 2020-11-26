@@ -37,7 +37,7 @@ class usbCommunication():
         else:
             return False
 if __name__ == "__main__":
-    zAxisUsbPort = '/dev/ttyUSB0'
+    zAxisUsbPort = '/dev/ttyACM0'
 
     test = usbCommunication(zAxisUsbPort, 9600)
     while True:

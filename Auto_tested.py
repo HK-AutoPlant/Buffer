@@ -5,6 +5,7 @@ import time
 import RPi.GPIO as GPIO
 import logging
 from SC import usbCommunication
+from termcolor import colored
 """
 HK2020 Autoplant 1 - Buffer Subsystem
 This is the high level software main file for the 2020 Mechatronics HK - Autoplant 1
@@ -86,9 +87,19 @@ class BufferControl():
         self.ser = serial.Serial(arduino_port, baudRate, timeout=1)
         com_open =  self.ser.is_open
         if com_open:
-            print("open")
-        time.sleep(10)
-        print("sleep over")
+            print("--------------------------------------------------------\n")
+            print(colored("COM PORT is open, please wait", 'green'))
+            for i in range(10):
+                time.sleep(1)
+                print(colored("Time left: " + str(9 - i), 'green'))
+            print(colored("Tray setup is ready!", "green"))
+            print("--------------------------------------------------------")
+        elif not com_open:
+            print("--------------------------------------------------------\n")
+            print(colored("COM PORT is not open, please check error logs in terminal", 'red'))
+            print("--------------------------------------------------------")   
+        #time.sleep(10)
+        #print("sleep over")
         self.tray_ready = False
         self.tray_ready_id = 1
         self.state = 0
@@ -176,7 +187,7 @@ class BufferControl():
     # Tray contron functionality #
     ##############################
     
-    def move_tray_init(self, input_var=True):
+    def move_tray_init(self, tray_num=1, input_var=True):
         """[Function to perform homing, or move tray to initial
         position]
 
@@ -188,6 +199,7 @@ class BufferControl():
         self.tray_position = 0
         # Assigns tray position variable to init position
         self.tray_ready = input_var
+        self.tray_ready_id = tray_num
         # self.ser.reset_input_buffer()
         # time.sleep(5)
         # self.sendMessage("8000001")

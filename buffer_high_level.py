@@ -5,6 +5,7 @@ import time
 import RPi.GPIO as GPIO
 import logging
 from SC import usbCommunication
+from termcolor import colored
 """
 HK2020 Autoplant 1 - Buffer Subsystem
 This is the high level software main file for the 2020 Mechatronics HK - Autoplant 1
@@ -84,14 +85,26 @@ class BufferControl():
         baudRate = 9600
         self.message = None
         self.ser = serial.Serial(arduino_port, baudRate, timeout=1)
+        print(self.ser.name)
         com_open =  self.ser.is_open
         if com_open:
-            print("open")
-        time.sleep(10)
-        print("sleep over")
+            print("--------------------------------------------------------\n")
+            print(colored("COM PORT is open, please wait", 'green'))
+            for i in range(5):
+                time.sleep(1)
+                print(colored("Time left: " + str(9 - i), 'green'))
+            print(colored("Tray setup is ready!", "green"))
+            print("--------------------------------------------------------")
+        elif not com_open:
+            print("--------------------------------------------------------\n")
+            print(colored("COM PORT is not open, please check error logs in terminal", 'red'))
+            print("--------------------------------------------------------")   
+        #time.sleep(10)
+        #print("sleep over")
         self.tray_ready = False
         self.tray_ready_id = 1
         self.state = 0
+        self.state_machine_counter = 0
         # 0 is initial position, stores position as states
         self.move_ready = False
         # When True, a tray has reached the restock zone and is in waiting state
@@ -148,11 +161,11 @@ class BufferControl():
         """
         return self.tray_ready, self.tray_ready_id
 
-    def trees_dropped(self):
+    def start_tray(self):
         """Outwards API, when trees have been deposited, call this to start
         state machine
         """
-        self.state_machine(self.tray_ready_id)
+        self.state_machine_runner()
     
     def tray_is_ready(self, tray_id):
         """[Use this function at the end of state machine
@@ -173,10 +186,10 @@ class BufferControl():
         # return True
 
     ##############################
-    # Tray contron functionality #
+    # Tray control functionality #
     ##############################
     
-    def move_tray_init(self, input_var=True):
+    def move_tray_init(self, tray_num=1, input_var=True):
         """[Function to perform homing, or move tray to initial
         position]
 
@@ -188,6 +201,7 @@ class BufferControl():
         self.tray_position = 0
         # Assigns tray position variable to init position
         self.tray_ready = input_var
+        self.tray_ready_id = tray_num
         # self.ser.reset_input_buffer()
         # time.sleep(5)
         # self.sendMessage("8000001")
@@ -204,136 +218,82 @@ class BufferControl():
             else:
                 pass
             time.sleep(0.5)
-
-    def state_machine(self, tray_id=1):
-        """[Buffer System state machine function to control the system logic]
-
-        Args:
-            tray_id (int, optional): [ID of the ready tray]. Defaults to 1.
+        self.tray_ready = True
+    
+    def state_machine_runner(self):
+        if self.state_machine_counter % 2 == 1:
+            self.state_machine()
+        else:
+            self.state_machine_two()
+        self.state_machine_counter += 1
+    
+    def state_machine_two(self):
+        """[State machine from left to right side]
         """
-        while True:
-            self.ser.reset_input_buffer()
-            self.move_tray_state_one()
-            time.sleep(1)
-            print("check 1")
-            self.open_tray()
-            print("open tray")
-            time.sleep(0.5)
-            self.move_tray_state_two()
-            time.sleep(1)
-            self.open_tray(2)
-            print("open tray")
-            time.sleep(0.5)
-            print("check 2")
-            self.move_tray_state_three()
-            time.sleep(1)
-            print("check 3")
-            self.open_tray()
-            print("open tray")
-            time.sleep(0.5)
-            self.move_tray_state_four()
-            time.sleep(1)
-            print("check 4")
-            self.open_tray(2)
-            print("open tray")
-            self.move_tray_state_five()
-            time.sleep(1)
-            print("check 5")
-            self.open_tray()
-            print("open tray")
-            self.move_tray_to_restock()
-            time.sleep(10)
-            print("At restock")
-            print("loop rerun")
-            
-        # if self.tray_ready:
-        #     counter = 0
-        #     self.check_plants()
-        #     for i in range(len(self.plant_in_cup)):
-        #         if self.plant_in_cup[i] == 1:
-        #             counter = counter + 1
-        #     if counter == 5:
-        #         state = 1
-        #         self.logging.debug("5 Plants were found after restock")
-        #     elif counter == 0:
-        #         state = 20
-        #         self.logging.error("No plants were found after restock. Tray will perform reset")
-        #     else:
-        #         state = 1
-        #         self.logging.warning("5 Plants were not found after restock, "
-        #                              "%d Plants were found in tray" % counter)
-        #     if state == 2:
-        #         self.move_tray_state_one()
-        #         self.tray_position = self.check_position()
-        #         # if (self.tray_position < 800) and (self.tray_position > 700) and (self.plant_in_cup[0] == 1):
-        #         self.open_tray()
-        #         self.tray_position = self.check_position()
+        self.ser.reset_input_buffer()
+        self.move_tray_to_restock()
+        time.sleep(10)
+        print(colored("Restock","green"))
+        self.move_tray_state_five()
+        time.sleep(1)
+        self.open_tray()
+        time.sleep(0.5)
+        self.move_tray_state_four()
+        time.sleep(1)
+        self.open_tray()
+        time.sleep(0.5)
+        self.move_tray_state_three()
+        time.sleep(1)
+        self.open_tray()
+        time.sleep(0.5)
+        self.move_tray_state_two()
+        time.sleep(1)
+        self.open_tray()
+        time.sleep(0.5)
+        self.move_tray_state_one()
+        time.sleep(1)
+        self.open_tray()
+        time.sleep(0.5)
+        self.state_machine_counter = self.state_machine_counter + 1
+        self.tray_ready = True
 
-        #     if state == 4:
-        #         self.move_tray_state_two()
-        #         self.open_tray()
-        #         # self.tray_position = self.check_position()
-        #         # if (self.tray_position < 600) and (self.tray_position > 500):
-        #         self.check_plants()
-        #         while self.plant_in_cup[1] == 1:
-        #             self.check_plants()
-        #             if self.plant_in_cup[1] == 0:
-        #                 state = 5
-        #             elif self.plant_in_cup[1] == 1:
-        #                 self.open_tray()
-        #         else:
-        #             # TODO Write to arduino to move to position
-        #             pass
-        #     if state == 5:
-        #         self.move_tray_state_three()
-        #         self.open_tray()
-        #         self.tray_position = self.check_position()
-        #         # if (self.tray_position < 500) and (self.tray_position > 400):
-        #         self.check_plants()
-        #         while self.plant_in_cup[2] == 1:
-        #             self.check_plants()
-        #             if self.plant_in_cup[2] == 0:
-        #                 state = 6
-        #             elif self.plant_in_cup[2] == 1:
-        #                 self.open_tray()
-        #         else:
-        #             # TODO Write to arduino to move to position 3
-        #             pass
-        #     if state == 6:
-        #         self.move_tray_state_four()
-        #         self.open_tray()
-        #         self.tray_position = self.check_position()
-        #         # if (self.tray_position < 400) and (self.tray_position > 300):
-        #         self.check_plants()
-        #         while self.plant_in_cup[3] == 1:
-        #             self.check_plants()
-        #             if self.plant_in_cup[3] == 0:
-        #                 state = 7
-        #             elif self.plant_in_cup[3] == 1:
-        #                 self.open_tray()
-        #         else:
-        #             # TODO Write to arduino to move to position 4
-        #             pass
-        #     if state == 7:
-        #         self.move_tray_state_five()
-        #         self.open_tray()
-        #         self.tray_position = self.check_position()
-        #         # if (self.tray_position < 300) and (self.tray_position > 200):
-        #         self.check_plants()
-        #         while self.plant_in_cup[4] == 1:
-        #             self.check_plants()
-        #             if self.plant_in_cup[4] == 0:
-        #                 state = 8
-        #             elif self.plant_in_cup[4] == 1:
-        #                 self.open_tray()
-        #         else:
-        #             # TODO Write to arduino to move to position 5
-        #             pass
-        #     if state == 8:
-        #         self.move_tray_to_end()
-        #     if state == 20:
-        #         self.move_tray_init()
-                
+    def state_machine(self):
+        """[State machine from right to left side]
+        """
+        self.ser.reset_input_buffer()
+        self.move_tray_state_one()
+        time.sleep(1)
+        print("check 1")
+        self.open_tray()
+        print("open tray")
+        time.sleep(0.5)
+        self.move_tray_state_two()
+        time.sleep(1)
+        self.open_tray(2)
+        print("open tray")
+        time.sleep(0.5)
+        print("check 2")
+        self.move_tray_state_three()
+        time.sleep(1)
+        print("check 3")
+        self.open_tray()
+        print("open tray")
+        time.sleep(0.5)
+        self.move_tray_state_four()
+        time.sleep(1)
+        print("check 4")
+        self.open_tray(2)
+        print("open tray")
+        self.move_tray_state_five()
+        time.sleep(1)
+        print("check 5")
+        self.open_tray()
+        print("open tray")
+        self.move_tray_to_restock()
+        time.sleep(10)
+        self.state_machine_counter = self.state_machine_counter + 1
+        self.tray_ready = True
+                    
     def current_state(self):
         """[Call this function to check the current state and position of the tray]
 
@@ -394,18 +354,21 @@ class BufferControl():
             output_array = output_array[1:]
         return output_array
 
-    def open_tray(self, direction = 1):
+    def open_tray(self):
         """[This functions opens the cup]
 
         Args:
             direction ([String | Int]): [Identifier necessary for knowing which direction to open]
         """
         #TODO Add code when motor installed? 
-        if (direction % 2) == 0:
-            self.sendMessage("1800000")
+
+        self.sendMessage("1800001")
+        time.sleep(2)
+        self.sendMessage("1800000")
+        
             # since its even, move to open tray two
-        if (direction % 2 ) == 1:
-            self.sendMessage("1800001")
+        # if (direction % 2 ) == 1:
+        #     self.sendMessage("1800001")
             # since its odd, move to open tray one
         waiting_for_finish = self.messageRecieved()
         while not waiting_for_finish:
@@ -543,6 +506,11 @@ class BufferControl():
 
 
 if __name__ == '__main__':
-    Buffer_Control = BufferControl("/dev/ttyUSB0")
-    Buffer_Control.state_machine(1)
-
+    try:
+        Buffer_Control = BufferControl("/dev/ttyACM0")
+        Buffer_Control.state_machine_runner()
+        Buffer_Control.state_machine_runner()
+    except KeyboardInterrupt:
+        print(colored("User Interrupt", "green"))
+    except:
+        pass
