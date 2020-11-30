@@ -149,11 +149,13 @@ class BufferControl():
     # API #
     #######
 
-    def is_tray_ready(self):
+    def get_tray_status(self, tray_id=1):
         """Outwards API, call this to check if a tray is ready
         If a tray is ready, return True and which tray 
         Note: Defaults to 1 if both trays are ready
 
+        Args:
+            tray_id (int, optional): [Choose tray ID]. Defaults to 1.
         Returns:
             [boolean]: [True = Yes | False = No]
             [int]: [tray id for tray 1 or 2]
@@ -161,29 +163,46 @@ class BufferControl():
         """
         return self.tray_ready, self.tray_ready_id
 
-    def start_tray(self):
+    def get_tray_position(self, tray_id=1):
+        """[summary]
+
+        Args:
+            tray_id (int, optional): [Choose tray ID]. Defaults to 1.
+
+        Returns:
+            [int]: [position in mm]
+            [int]: [tray id for tray 1 or 2]
+        """
+        #TODO Add the query position code
+        return self.tray_position, self.tray_ready_id
+
+    def set_state_machine(self, tray_id=1):
         """Outwards API, when trees have been deposited, call this to start
         state machine
+        
+        Args:
+            tray_id (int, optional): [Choose tray ID]. Defaults to 1.
         """
         self.state_machine_runner()
     
-    def tray_is_ready(self, tray_id):
-        """[Use this function at the end of state machine
-        Notifies the UI that a tray is ready and takes its tray ID
-        # TODO get an API from Mathis/other that can be called for this action
-        # ]
+    def set_movement_manual(self, length, direction=0, tray_id=1):
+        """[summary]
 
         Args:
-            tray_id ([int]): [tray ID of the ready tray]
-
-        Raises:
-            EmergencyInterruptException: [Something went horribly wrong]
-
-        Returns:
-            [boolean]: [Did we succeed or not? Might need a return]
+            length (int): [How far to move the tray]
+            direction (int, optional): [description]. Defaults to 0.
+            tray_id (int, optional): [description]. Defaults to 1.
         """
-        self.logging.info("Get a callable API to update UI that a tray is ready")
-        # return True
+        #TODO Add Code Here
+        #TODO Code needs call to arduino, wait for success and API string
+        
+    def set_open_cup_manual(self, tray_id=1):
+        """[summary]
+
+        Args:
+            tray_id (int, optional): [Choose tray ID]. Defaults to 1.
+        """
+        self.open_tray()
 
     ##############################
     # Tray control functionality #
@@ -223,8 +242,10 @@ class BufferControl():
     def state_machine_runner(self):
         if self.state_machine_counter % 2 == 0:
             self.state_machine()
-        else:
+        elif self.state_machine_counter %2 == 1:
             self.state_machine_two()
+        else:
+            print(colored("Counter is not of modulus 2, it's %d"% self.state_machine_counter,"green"))
     
     def state_machine_two(self):
         """[State machine from left to right side]
@@ -502,8 +523,8 @@ class BufferControl():
 if __name__ == '__main__':
     try:
         Buffer_Control = BufferControl("/dev/ttyACM0")
-        Buffer_Control.state_machine()
-        Buffer_Control.state_machine_two()
+        Buffer_Control.set_state_machine()
+        Buffer_Control.set_state_machine()
     except KeyboardInterrupt:
         print(colored("User Interrupt", "green"))
     except:
