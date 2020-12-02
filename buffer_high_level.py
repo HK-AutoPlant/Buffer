@@ -72,8 +72,7 @@ class NoTrayReadyException(Exception):
 class BufferControl():
     """
     This class deals with overall workings and logics for the buffer system
-    Call this class to create one thread for one buffer tray system(?)
-    TODO Ask Mattias how to assign "workers" to a function (would be neat to use!!!)
+    Call this class to create one thread for a buffer tray system
     If both trays are ready, use tray 1
     """
     def __init__(self, arduino_port="/dev/ttyACM0"):
@@ -88,19 +87,11 @@ class BufferControl():
         print(self.ser.name)
         com_open =  self.ser.is_open
         if com_open:
-            print("--------------------------------------------------------\n")
-            print(colored("COM PORT is open, please wait", 'green'))
-            for i in range(5):
-                time.sleep(1)
-                print(colored("Time left: " + str(9 - i), 'green'))
-            print(colored("Tray setup is ready!", "green"))
-            print("--------------------------------------------------------")
+            time.sleep(5)
         elif not com_open:
             print("--------------------------------------------------------\n")
             print(colored("COM PORT is not open, please check error logs in terminal", 'red'))
             print("--------------------------------------------------------")   
-        #time.sleep(10)
-        #print("sleep over")
         self.tray_ready = False
         self.tray_ready_id = 1
         self.state = 0
@@ -122,12 +113,13 @@ class BufferControl():
                                  filemode="w", format='%(name)s - %(levelname)s - %(message)s '
                                                       '-%(asctime)s - %(message)s', datefmt='%d-%b-%y %H:%M:%S')
         self.logging.debug("Started high level buffer thread")
+        print("Homing Buffer")
         self.move_tray_init()
 
     def sendMessage(self, msg):
         self.ser.reset_input_buffer()
         self.ser.write(msg.encode('utf-8'))
-        time.sleep(0.5)
+        time.sleep(0.25)
         
     def readMessage(self):
         # self.ser.reset_output_buffer()
@@ -173,7 +165,19 @@ class BufferControl():
             [int]: [position in mm]
             [int]: [tray id for tray 1 or 2]
         """
-        #TODO Add the query position code
+        self.sendMessage("6000000")
+        waiting_for_finish = self.messageRecieved()
+        while not waiting_for_finish:
+            return_data = self.readMessage()
+            waiting_for_finish = self.messageRecieved()
+            if return_data == "999" or return_data == "999":
+                waiting_for_finish = True
+            elif return_data == "666" or return_data == "666":
+                waiting_for_finish = True
+                # raise NoTrayReadyException
+            else:
+                pass
+            time.sleep(0.1)
         return self.tray_position, self.tray_ready_id
 
     def set_state_machine(self, tray_id=1):
@@ -236,13 +240,13 @@ class BufferControl():
                 # raise NoTrayReadyException
             else:
                 pass
-            time.sleep(0.5)
+            time.sleep(0.1)
         self.tray_ready = True
     
     def state_machine_runner(self):
         if self.state_machine_counter % 2 == 0:
             self.state_machine()
-        elif self.state_machine_counter %2 == 1:
+        elif self.state_machine_counter % 2 == 1:
             self.state_machine_two()
         else:
             print(colored("Counter is not of modulus 2, it's %d"% self.state_machine_counter,"green"))
@@ -273,11 +277,11 @@ class BufferControl():
         self.open_tray()
         time.sleep(0.1)
         self.move_tray_init()
-        time.sleep(10)
-        print(colored("Restocking!", "red"))
-        self.state_machine_counter += 1
-        print(self.state_machine_counter)
-        self.tray_ready = True
+        # time.sleep(10)
+        # print(colored("Restocking!", "red"))
+        # self.state_machine_counter += 1
+        # print(self.state_machine_counter)
+        # self.tray_ready = True
 
     def state_machine(self):
         """[State machine from right to left side]
@@ -303,11 +307,11 @@ class BufferControl():
         time.sleep(0.1)
         self.open_tray()
         self.move_tray_to_restock()
-        print(colored("Restocking!", "green"))
-        time.sleep(10)
-        self.state_machine_counter += 1
-        print(self.state_machine_counter)
-        self.tray_ready = True
+        # print(colored("Restocking!", "green"))
+        # time.sleep(10)
+        # self.state_machine_counter += 1
+        # print(self.state_machine_counter)
+        # self.tray_ready = True
                     
     def current_state(self):
         """[Call this function to check the current state and position of the tray]
@@ -378,7 +382,7 @@ class BufferControl():
         #TODO Add code when motor installed? 
 
         self.sendMessage("1800001")
-        time.sleep(2)
+        time.sleep(0.5)
         self.sendMessage("1800000")
         
             # since its even, move to open tray two
@@ -414,7 +418,7 @@ class BufferControl():
                 # raise NoTrayReadyException
             else:
                 pass
-            time.sleep(0.5)
+            time.sleep(0.1)
                 
 
     def move_tray_state_two(self):
@@ -433,7 +437,7 @@ class BufferControl():
                 # raise NoTrayReadyException
             else:
                 pass
-            time.sleep(0.5)
+            time.sleep(0.1)
 
     def move_tray_state_three(self):
         """[Move tray to state three]
@@ -451,7 +455,7 @@ class BufferControl():
                 # raise NoTrayReadyException
             else:
                 pass
-            time.sleep(0.5)
+            time.sleep(0.1)
 
     def move_tray_state_four(self):
         """[Move tray to state four]
@@ -469,7 +473,7 @@ class BufferControl():
                 # raise NoTrayReadyException
             else:
                 pass
-            time.sleep(0.5)
+            time.sleep(0.1)
 
     def move_tray_state_five(self):
         """[Move tray to state five]
@@ -487,7 +491,7 @@ class BufferControl():
                 # raise NoTrayReadyException
             else:
                 pass
-            time.sleep(0.5)
+            time.sleep(0.1)
             
     def move_tray_to_restock(self):
         """[Move tray to restock position]
@@ -517,7 +521,6 @@ class BufferControl():
         # TODO After performing system reset, send a wait to gripper/gantry
         # TODO After an entire rerun of the tray has been performed, stop wait
         raise EmergencyInterruptException()
-
 
 
 if __name__ == '__main__':
