@@ -17,6 +17,7 @@ MainBuffer
 Imports usbCommunication from Autoplant/Gantry (Credit: Philip)
 """
 
+DEBUG = True
 
 # class NanoUsb(object):
 #     """
@@ -126,7 +127,7 @@ class BufferControl():
         if self.messageRecieved():
             message = self.ser.readline().decode('utf-8').rstrip()
             self.ser.reset_output_buffer()
-            print("Message Read: %s" % message)
+            # print("Message Read: %s" % message)
             return message
         else:
             pass
@@ -380,7 +381,10 @@ class BufferControl():
             direction ([String | Int]): [Identifier necessary for knowing which direction to open]
         """
         #TODO Add code when motor installed? 
-
+        if DEBUG:
+            print("Open Tray")
+        else:
+            pass
         self.sendMessage("1800001")
         time.sleep(0.5)
         self.sendMessage("1800000")
@@ -405,6 +409,10 @@ class BufferControl():
     def move_tray_state_one(self):
         """[Move tray to state one]
         """
+        if DEBUG:
+            print("state one")
+        else:
+            pass
         self.sendMessage("1110000")
         self.ser.reset_input_buffer()
         waiting_for_finish = self.messageRecieved()
@@ -424,6 +432,10 @@ class BufferControl():
     def move_tray_state_two(self):
         """[Move tray to state two]
         """
+        if DEBUG:
+            print("state two")
+        else:
+            pass
         self.sendMessage("1120000")
         self.ser.reset_input_buffer()
         waiting_for_finish = self.messageRecieved()
@@ -442,6 +454,10 @@ class BufferControl():
     def move_tray_state_three(self):
         """[Move tray to state three]
         """
+        if DEBUG:
+            print("state three")
+        else:
+            pass
         self.sendMessage("1130000")
         self.ser.reset_input_buffer()
         waiting_for_finish = self.messageRecieved()
@@ -460,6 +476,10 @@ class BufferControl():
     def move_tray_state_four(self):
         """[Move tray to state four]
         """
+        if DEBUG:
+            print("state four")
+        else:
+            pass
         self.sendMessage("1140000")
         self.ser.reset_input_buffer()
         waiting_for_finish = self.messageRecieved()
@@ -478,6 +498,10 @@ class BufferControl():
     def move_tray_state_five(self):
         """[Move tray to state five]
         """
+        if DEBUG:
+            print("state five")
+        else:
+            pass
         self.sendMessage("1150000")
         self.ser.reset_input_buffer()
         waiting_for_finish = self.messageRecieved()
@@ -496,6 +520,10 @@ class BufferControl():
     def move_tray_to_restock(self):
         """[Move tray to restock position]
         """
+        if DEBUG:
+            print("state restock position")
+        else:
+            pass
         self.sendMessage("1160000")
         self.ser.reset_input_buffer()
         waiting_for_finish = True
