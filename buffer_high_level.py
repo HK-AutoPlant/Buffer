@@ -2,65 +2,24 @@
 
 import serial
 import time
-import RPi.GPIO as GPIO
 import logging
+import sys
 from SC import usbCommunication
 from termcolor import colored
+# sys.path.append("..zAxi/Python")
+# from Python import usbCommunication
 """
 HK2020 Autoplant 1 - Buffer Subsystem
 This is the high level software main file for the 2020 Mechatronics HK - Autoplant 1
 This file controls the high level logic for the buffer system.
 Run this file to control the low level
-Microcontrollers (Arduino Nanos) which in turn control the hardware.
+Microcontrollers which in turn control the hardware.
 This file has following classes:
-MainBuffer
+BufferControl
 Imports usbCommunication from Autoplant/Gantry (Credit: Philip)
 """
 
-DEBUG = True
-
-# class NanoUsb(object):
-#     """
-#     This class creates base communication methods between Rpi and Arduino Nano
-#     read/write methods using typical API write/recv
-#     Needs more functions!
-#     """
-#     def __init__(self, port=""):
-#         """
-#         Opens Serial connection via USB from
-#         """
-#         baud = 115200
-#         if port == "":
-#             port = "/dev/ttyUSB0"
-#         try:
-#             self.serial_nano = serial.Serial(str(port), baudrate=baud, timeout=0.01)  # Example, can be ttyUSB0/1 etc
-#         except ValueError as e:
-#             pass
-#         if port == "/dev/ttyUSB0":
-#             self.tray_id = 1
-#         elif port == "/dev/ttyUSB1":
-#             self.tray_id = 2
-#         else:
-#             self.tray_id = 1
-# 
-#     def serial_waiting(self, nano):
-#         """
-#         Waiting Function that waits and then decodes a message
-#         Waits until there's a communication waiting on the BUS
-#         :return: True
-#         True is only returned when there's more than 0 bytes on the serial connection to be read
-#         """
-#         if self.serial_nano.in_waiting > 0:
-#             return True
-# 
-#     def write(self, two, three):
-#         data = self.tray_id*100+10*two+three
-#         self.serial_nano.sendMessage(data)
-# 
-#     def recv(self):
-#         data = self.serial_nano.readline()
-#         return data  # .decode('Ascii')
-
+DEBUG = False
 
 class EmergencyInterruptException(Exception):
     pass
@@ -77,7 +36,6 @@ class BufferControl():
     If both trays are ready, use tray 1
     """
     def __init__(self, arduino_port="/dev/ttyACM0"):
-        # super().__init__(arduino_port, 115200)
         """
         :param arduino_port: port ID for the arduino device
         :type arduino_port: String 
@@ -103,12 +61,6 @@ class BufferControl():
         self.restock_counter = 0
         self.plant_in_cup = [0,0,0,0,0]
         # self.sensor_pin = 20
-        # self.GPIO = GPIO
-        # self.GPIO.setmode(self.GPIO.BCM)
-        # self.GPIO.setup(self.sensor_pin, self.GPIO.IN, pull_up_down=self.GPIO.PUD_UP)
-        # Setup the thread sensor interrupts to appropriate sensor pin
-        # self.GPIO.add_event_detect(self.sensor_pin, self.GPIO.BOTH,
-        #                            callback=self.sensor_interrupt_callback(), bouncetime=50)
         self.logging = logging
         self.logging.basicConfig(level=logging.DEBUG, filename="thread_logger.log",
                                  filemode="w", format='%(name)s - %(levelname)s - %(message)s '
@@ -120,14 +72,15 @@ class BufferControl():
     def sendMessage(self, msg):
         self.ser.reset_input_buffer()
         self.ser.write(msg.encode('utf-8'))
-        time.sleep(0.25)
+        time.sleep(0.5)
         
     def readMessage(self):
         # self.ser.reset_output_buffer()
         if self.messageRecieved():
             message = self.ser.readline().decode('utf-8').rstrip()
             self.ser.reset_output_buffer()
-            # print("Message Read: %s" % message)
+            if DEBUG:
+                print("Message Read: %s" % message)
             return message
         else:
             pass
@@ -287,7 +240,7 @@ class BufferControl():
     def state_machine(self):
         """[State machine from right to left side]
         """
-        print(colored("State machine 2", "green"))
+        print(colored("State machine 1", "green"))
         self.ser.reset_input_buffer()
         self.move_tray_state_one()
         time.sleep(0.1)
@@ -386,7 +339,7 @@ class BufferControl():
         else:
             pass
         self.sendMessage("1800001")
-        time.sleep(0.5)
+        time.sleep(1.5)
         self.sendMessage("1800000")
         
             # since its even, move to open tray two
@@ -542,21 +495,13 @@ class BufferControl():
         # This Function should move tray two from drop-off zone and back
         pass
 
-    def sensor_interrupt_callback(self):
-        """[This function can be called for performing interrupt sequence]
-        """
-        print("Sensor Triggered")
-        # TODO After performing system reset, send a wait to gripper/gantry
-        # TODO After an entire rerun of the tray has been performed, stop wait
-        raise EmergencyInterruptException()
-
 
 if __name__ == '__main__':
     try:
         Buffer_Control = BufferControl("/dev/ttyACM0")
-        Buffer_Control.set_state_machine()
-        Buffer_Control.set_state_machine()
+        Buffer_Control.state_machine()
+        Buffer_Control.state_machine_two()
     except KeyboardInterrupt:
         print(colored("User Interrupt", "green"))
-    except:
-        pass
+    except Exception as exp:
+        print(exp)
