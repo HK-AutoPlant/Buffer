@@ -146,7 +146,7 @@ int lever_drive(int lever_command){
   
   switch (lever_command){
     case 0:
-      value = 110;
+      value = 90;
       break;
     case 1:
       if (motor == 2){
