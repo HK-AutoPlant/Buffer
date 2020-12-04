@@ -100,12 +100,12 @@ class BufferControl():
     def move_buffer_forward(self):
         """Send to buffer to move (50mm?) forwards (away from homing position)
         """
-        self.sendMessage("1310000")
+        self.sendMessage("1300000")
 
     def move_buffer_backwards(self):
         """Send to buffer to move (50mm?) backwards (towards homing position)
         """
-        self.sendMessage("1300000")
+        self.sendMessage("1400000")
 
     def get_tray_status(self, tray_id=1):
         """Outwards API, call this to check if a tray is ready
